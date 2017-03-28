@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN" "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping package="org.openmrs.module.dhisreport.api.model">
+    <class name="ReportDefinition" table="${project.parent.artifactId}_report_definition">
+        <id column="id" name="id" unsaved-value="0">
+            <generator class="native"/>
+        </id>
+        <discriminator column="id" insert="false"/>
+        <property column="report_name" name="name"/>
+        <property column="uid" name="uid"/>
+        <property column="code" name="code"/>
+        <property column="periodType" name="periodType"/>
+        <set name="dataValueTemplates" 
+         table="${project.parent.artifactId}_datavalue_template"
+         cascade="all-delete-orphan" inverse="true" lazy="true" fetch="select">
+            <key column="report_definition_id" not-null="true"/>
+            <one-to-many class="DataValueTemplate"/>
+        </set>
+        <set name="queries"
+             table="${project.parent.artifactId}_dataelementquery"
+             cascade="all-delete-orphan" inverse="true" lazy="true" fetch="select">
+            <key column="report_definition_id" not-null="true"/>
+            <one-to-many class="DataElementQuery"/>
+        </set>
+        <set name="metaDataValueTemplates"
+             table="${project.parent.artifactId}_metadatavalue_template"
+             cascade="all-delete-orphan" inverse="true" lazy="true" fetch="select">
+            <key column="report_definition_id" not-null="true"/>
+            <one-to-many class="MetaDataValueTemplate"/>
+        </set>
+        <property column="reportingreportuuid" name="reportingReportId"/>
+        <property column="scheduled" name="scheduled" />
+    </class>
+</hibernate-mapping>

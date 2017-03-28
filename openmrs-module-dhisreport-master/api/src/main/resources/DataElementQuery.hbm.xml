@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN" "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping package="org.openmrs.module.dhisreport.api.model">
+    <class name="DataElementQuery" table="${project.parent.artifactId}_dataelementquery">
+        <id column="id" name="id" unsaved-value="0">
+            <generator class="native"/>
+        </id>
+        <discriminator column="id" insert="false"/>
+        <property column="uid" name="uid" unique="true"/>
+        <property column="query" name="query" />
+        <property column="prefix" name="prefix" />
+        <property column="codeprefix" name="codeprefix" />
+
+        <many-to-one name="reportDefinition" column="report_definition_id" not-null="true" fetch="select"/>
+        <many-to-one name="disaggregation" column="disaggregation_id"  not-null="true"/>
+    </class>
+</hibernate-mapping>

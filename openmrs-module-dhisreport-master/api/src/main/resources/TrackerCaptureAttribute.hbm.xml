@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN" "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping package="org.openmrs.module.dhisreport.api.trackercapture">
+    <class name="TrackerCaptureAttribute" table="${project.parent.artifactId}_trackercaptureattribute">
+        <id column="id" type="java.lang.Integer" name="id" unsaved-value="0">
+            <generator class="native"/>
+        </id>
+        <discriminator column="id" insert="false"/>
+        <property column="uid" name="uid" unique="true"/>
+        <property column="name" name="name" unique="true"/>
+        <property column="query" name="query"/>
+        <many-to-one name="template" column="report_tracker_capture_id" fetch="select"/>
+    </class>
+</hibernate-mapping>
