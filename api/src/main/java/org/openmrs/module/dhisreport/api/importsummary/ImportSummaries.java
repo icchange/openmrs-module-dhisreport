@@ -35,6 +35,8 @@ public class ImportSummaries
     @XmlElement( name = "importSummary" )
     private List<ImportSummary> importSummaryList;
 
+    private String message;
+
     public int getImported()
     {
         return imported;
@@ -84,4 +86,5 @@ public class ImportSummaries
     {
         this.importSummaryList = importSummaryList;
     }
+
 }

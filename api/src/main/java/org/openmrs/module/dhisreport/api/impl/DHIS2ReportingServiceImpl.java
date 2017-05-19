@@ -21,6 +21,9 @@ package org.openmrs.module.dhisreport.api.impl;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.Map.Entry;
 
@@ -28,7 +31,6 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.hisp.dhis.dxf2.importsummary.ImportSummary;
@@ -36,29 +38,37 @@ import org.openmrs.Location;
 import org.openmrs.LocationAttribute;
 import org.openmrs.api.context.Context;
 import org.openmrs.api.impl.BaseOpenmrsService;
+import org.openmrs.module.dhisreport.api.AggregatedResultSet;
 import org.openmrs.module.dhisreport.api.DHIS2ReportingException;
 import org.openmrs.module.dhisreport.api.DHIS2ReportingService;
 import org.openmrs.module.dhisreport.api.adx.AdxType;
+import org.openmrs.module.dhisreport.api.adx.DataValueType;
+import org.openmrs.module.dhisreport.api.adx.GroupType;
 import org.openmrs.module.dhisreport.api.db.DHIS2ReportingDAO;
 import org.openmrs.module.dhisreport.api.dhis.HttpDhis2Server;
+import org.openmrs.module.dhisreport.api.exceptions.LocationException;
+import org.openmrs.module.dhisreport.api.exceptions.SendMetaDataException;
+import org.openmrs.module.dhisreport.api.exceptions.SendReportException;
 import org.openmrs.module.dhisreport.api.importsummary.ImportSummaries;
 import org.openmrs.module.dhisreport.api.model.*;
 import org.openmrs.module.dhisreport.api.dxf2.DataValue;
 import org.openmrs.module.dhisreport.api.dxf2.DataValueSet;
 import org.openmrs.module.dhisreport.api.model.ReportDefinition;
+import org.openmrs.module.dhisreport.api.utils.DailyPeriod;
+import org.openmrs.module.dhisreport.api.utils.MonthlyPeriod;
 import org.openmrs.module.dhisreport.api.utils.Period;
+import org.openmrs.module.dhisreport.api.utils.WeeklyPeriod;
 import org.openmrs.module.reporting.dataset.DataSet;
 import org.openmrs.module.reporting.dataset.DataSetRow;
 import org.openmrs.module.reporting.evaluation.EvaluationContext;
 import org.openmrs.module.reporting.evaluation.MissingDependencyException;
 import org.openmrs.module.reporting.evaluation.parameter.*;
 import org.openmrs.module.reporting.report.ReportData;
-import org.openmrs.module.reporting.report.ReportRequest;
 import org.openmrs.module.reporting.report.definition.*;
 import org.openmrs.module.reporting.report.definition.service.ReportDefinitionService;
 import org.openmrs.module.reporting.report.service.ReportService;
 import org.openmrs.module.reporting.report.util.PeriodIndicatorReportUtil;
-import org.springframework.transaction.annotation.Transactional;
+import org.openmrs.util.LocationUtility;
 
 /**
  * It is a default implementation of {@link DHIS2ReportingService}.
@@ -124,6 +134,56 @@ public class DHIS2ReportingServiceImpl
     }
 
     @Override
+    public ImportSummaries postDxf2Report( AdxType adxReport )
+        throws DHIS2ReportingException
+    {
+        return dhis2Server.postDxf2Report( adxReport );
+    }
+
+    @Override
+    public ImportSummaries postMetaData( String metadata )
+        throws DHIS2ReportingException
+    {
+        return dhis2Server.postMetaData( metadata );
+    }
+
+    @Override
+    public List<String[]> getDataElements( List<Object[]> elements, String prefix )
+    {
+        return dhis2Server.getDataElements( elements, prefix );
+    }
+
+    @Override
+    public DataElementQuery getDataElementQuery( Integer id )
+    {
+        return dao.getDataElementQuery( id );
+    }
+
+    @Override
+    public DataElementQuery getDataElementQueryByUid( String uid )
+    {
+        return null;
+    }
+
+    @Override
+    public DataElementQuery getDataElementQueryByCode( String code )
+    {
+        return null;
+    }
+
+    @Override
+    public DataElementQuery saveDataElementQuery( DataElementQuery dq )
+    {
+        return dao.saveDataElementQuery( dq );
+    }
+
+    @Override
+    public void purgeDataElementQuery( DataElementQuery dq )
+    {
+        dao.deleteDataElementQuery( dq );
+    }
+
+    @Override
     public DataElement getDataElement( Integer id )
     {
         return dao.getDataElement( id );
@@ -179,6 +239,11 @@ public class DHIS2ReportingServiceImpl
     public ReportDefinition getReportDefinitionByCode( String code )
     {
         return dao.getReportDefinitionByCode( code );
+    }
+
+    public List<ReportDefinition> getReportDefinitionByPeriodType( String periodType )
+    {
+        return dao.getReportDefinitionByPeriodType( periodType );
     }
 
     @Override
@@ -251,13 +316,22 @@ public class DHIS2ReportingServiceImpl
         {
             DataValue dataValue = new DataValue();
             dataValue.setDataElement( dvt.getDataelement().getCode() );
-            dataValue.setCategoryOptionCombo( dvt.getDisaggregation().getCode() );
+            dataValue.setDataElementName( dvt.getDataelement().getName() );
+            dataValue.setDataElementCode( dvt.getDataelement().getCode() );
+            dataValue.setUid( dvt.getDataelement().getUid() );
+            //dataValue.setCategoryOptionCombo( dvt.getDisaggregation().getCode() );
+            dataValue.setCategoryOptionCombo( dvt.getDisaggregation().getUid() );
+            dataValue.setCategoryOptionComboName( dvt.getDisaggregation().getName() );
+            dataValue.setCategoryOptionComboCode( dvt.getDisaggregation().getCode() );
+            dataValue.setAttributeOptionCombo( dvt.getDisaggregation().getAttributeOptionCombo() );
 
             try
             {
                 String value = dao.evaluateDataValueTemplate( dvt, period, location );
                 if ( value != null )
                 {
+                    System.out.println( dvt.getDataelement().getName() + " '" + dvt.getDataelement().getId() + "' '"
+                        + dvt.getDataelement().getCode() + "' " + dvt.getDisaggregation().getName() + " " + value );
                     dataValue.setValue( value );
                     dataValues.add( dataValue );
                 }
@@ -270,6 +344,23 @@ public class DHIS2ReportingServiceImpl
         }
 
         return dataValueSet;
+    }
+
+    @Override
+    public List<Object[]> evaluateDataElementQueries( DataElementQuery dataElementQuery, Location location )
+    {
+        List<Object[]> values = new ArrayList<Object[]>();
+        try
+        {
+            values = dao.evaluateDataElementQuery( dataElementQuery, location );
+        }
+        catch ( DHIS2ReportingException ex )
+        {
+            // TODO: percolate this through to UI
+            log.warn( ex.getMessage() );
+        }
+
+        return values;
     }
 
     @Override
@@ -355,7 +446,9 @@ public class DHIS2ReportingServiceImpl
         {
             DataValue dataValue = new DataValue();
             dataValue.setDataElement( dvt.getDataelement().getCode() );
-            dataValue.setCategoryOptionCombo( dvt.getDisaggregation().getCode() );
+            //dataValue.setCategoryOptionCombo( dvt.getDisaggregation().getCode() );
+            dataValue.setCategoryOptionCombo( dvt.getDisaggregation().getUid() );
+            dataValue.setAttributeOptionCombo( dvt.getDisaggregation().getAttributeOptionCombo() );
             dataValue.setValue( dsrlist.get( count ).toString() );
             dataValues.add( dataValue );
             count++;
@@ -393,9 +486,13 @@ public class DHIS2ReportingServiceImpl
         Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
         ReportTemplates reportTemplates = (ReportTemplates) jaxbUnmarshaller.unmarshal( is );
 
-        for ( DataElement de : reportTemplates.getDataElements() )
+        //todo might need to add error handling
+        if ( reportTemplates.getDataElements() != null )
         {
-            saveDataElement( de );
+            for ( DataElement de : reportTemplates.getDataElements() )
+            {
+                saveDataElement( de );
+            }
         }
         for ( Disaggregation disagg : reportTemplates.getDisaggregations() )
         {
@@ -403,15 +500,26 @@ public class DHIS2ReportingServiceImpl
         }
         for ( ReportDefinition rd : reportTemplates.getReportDefinitions() )
         {
-            //            System.out.println( "entered my choice loop------------------------------------" );
-            //            System.out.println( rd.getName() );
-            for ( DataValueTemplate dvt : rd.getDataValueTemplates() )
+            if ( rd.getMetaDataValueTemplates() != null )
             {
-                //                System.out.println( "davt--------------------------" );
-                dvt.setReportDefinition( rd );
-
-                //                saveDataValueTemplate( dvt );
-                //                System.out.println( dvt.getId() );
+                for ( MetaDataValueTemplate mdvt : rd.getMetaDataValueTemplates() )
+                {
+                    mdvt.setReportDefinition( rd );
+                }
+            }
+            if ( rd.getDataValueTemplates() != null )
+            {
+                for ( DataValueTemplate dvt : rd.getDataValueTemplates() )
+                {
+                    dvt.setReportDefinition( rd );
+                }
+            }
+            if ( reportTemplates.getDataElementQuerys() != null )
+            {
+                for ( DataElementQuery dq : reportTemplates.getDataElementQuerys() )
+                {
+                    rd.addQueries( dq );
+                }
             }
             saveReportDefinition( rd );
         }
@@ -486,5 +594,564 @@ public class DHIS2ReportingServiceImpl
             }
         }
         return null;
+    }
+
+    /***
+     *
+     ***/
+    @Override
+    public List<AggregatedResultSet> postBulkReportDefinition( String reportType, String destination, String freq,
+        String dateStr, int consecutive, String mappingType )
+        throws ParseException, LocationException, SendMetaDataException, SendReportException
+    {
+        DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
+
+        //get a period from the date string
+        Period period;
+        period = getPeriodFromDateString( freq, dateStr );
+
+        //get period list of consecutive dates after current period up to consecutive value limit
+        List<Period> periodList = generatePeriodList( period, consecutive );
+
+        // Get Location by OrgUnit Code
+        List<Location> locationListFinal;
+        locationListFinal = getValidLocationList();
+
+        List<AggregatedResultSet> aggregatedList = new ArrayList<AggregatedResultSet>();
+
+        //run reports and metadata
+        List<ReportDefinition> definitionList = service.getReportDefinitionByPeriodType( reportType );
+        for ( ReportDefinition r : definitionList )
+        {
+            for ( Location l : locationListFinal )
+            {
+                //send meta data
+                try
+                {
+                    aggregatedList.add( sendMetadata( destination, r, l ) );
+                }
+                catch ( DHIS2ReportingException ex )
+                {
+                    ex.printStackTrace();
+                    throw new SendMetaDataException();
+                }
+
+                for ( Period periodValue : periodList )
+                {
+                    //send report
+                    try
+                    {
+                        aggregatedList.add( sendReport( mappingType, destination, r, periodValue, l ) );
+                    }
+                    catch ( Exception e )
+                    {
+                        e.printStackTrace();
+                        throw new SendReportException();
+                    }
+
+                }
+            }
+        }
+        return aggregatedList;
+    }
+
+    @Override
+    public List<AggregatedResultSet> postReportDefinition( int reportDefinition_id, String destination, String freq,
+        String dateStr, int consecutive, String mappingType )
+        throws ParseException, LocationException, SendMetaDataException, SendReportException
+    {
+        //get a period from the date string
+        Period period;
+
+        period = getPeriodFromDateString( freq, dateStr );
+
+        //get period list of consecutive dates after current period up to consecutive value limit
+        List<Period> periodList = generatePeriodList( period, consecutive );
+
+        // Get Location by OrgUnit Code
+        List<Location> locationListFinal;
+        locationListFinal = getValidLocationList();
+
+        //ImportSummaries importSummaries = null;
+        List<AggregatedResultSet> aggregatedList = new ArrayList<AggregatedResultSet>();
+
+        //set up and run report definition
+
+        //for each location
+        for ( Location l : locationListFinal )
+        {
+            ReportDefinition report = Context.getService( DHIS2ReportingService.class ).getReportDefinition(
+                reportDefinition_id );
+
+            //send meta data
+            try
+            {
+                aggregatedList.add( sendMetadata( destination, report, l ) );
+            }
+            catch ( DHIS2ReportingException ex )
+            {
+                ex.printStackTrace();
+                throw new SendMetaDataException();
+            }
+
+            //for each date period
+            for ( Period periodValue : periodList )
+            {
+
+                //send report
+                try
+                {
+                    System.out.println( "report start" );
+                    aggregatedList.add( sendReport( mappingType, destination, report, periodValue, l ) );
+                    System.out.println( "report end" );
+                }
+                catch ( Exception e )
+                {
+                    System.out.println( "report error" );
+                    e.printStackTrace();
+                    throw new SendReportException();
+                }
+            }
+        }
+        return aggregatedList;
+    }
+
+    public Period getPeriodFromDateString( String freq, String dateStr )
+        throws ParseException
+    {
+        Period period = null;
+        if ( freq.equalsIgnoreCase( "monthly" ) )
+        {
+            period = monthly( dateStr );
+        }
+        if ( freq.equalsIgnoreCase( "weekly" ) )
+        {
+            period = weekly( dateStr );
+        }
+        if ( freq.equalsIgnoreCase( "daily" ) )
+        {
+            period = daily( dateStr );
+        }
+        return period;
+    }
+
+    public List<Period> generatePeriodList( Period period, int consecutive )
+    {
+        List<Period> periodList = new ArrayList<Period>();
+        periodList.add( period );
+        for ( int i = 1; i < consecutive; i++ )
+        {
+            Period nextPeriod = period.getAsIsoStringNextValue( i );
+            periodList.add( nextPeriod );
+        }
+        return periodList;
+    }
+
+    public List<Location> getValidLocationList()
+        throws LocationException
+    {
+        List<Location> locationList = new ArrayList<Location>();
+        List<Location> locationListFinal = new ArrayList<Location>();
+        //use below line if not location restricting
+        locationList.addAll( Context.getLocationService().getAllLocations() );
+        //use below line if location restricting to current
+        //locationList.add( LocationUtility.getDefaultLocation() );
+        Location userLocation = LocationUtility.getDefaultLocation();
+        //remove locations without Organization Unit Codes
+        for ( Location l : locationList )
+        {
+            for ( LocationAttribute la : l.getActiveAttributes() )
+            {
+                if ( la.getAttributeType().getName().equals( "CODE" ) && (l.getId() == userLocation.getId()) )
+                {
+                    if ( !la.getValue().toString().isEmpty() && la.getValue().toString() != null )
+                    {
+                        locationListFinal.add( l );
+                        break;
+                    }
+                }
+                else if ( la.getAttributeType().getName().equals( "MASTERCODE" ) )
+                {
+                    if ( !la.getValue().toString().isEmpty() && la.getValue().toString() != null )
+                    {
+                        locationListFinal.add( l );
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ( locationListFinal.isEmpty() && !locationList.isEmpty() )
+        {
+            throw new LocationException();
+        }
+
+        return locationListFinal;
+    }
+
+    public AggregatedResultSet sendMetadata( String destination, ReportDefinition report, Location l )
+        throws DHIS2ReportingException
+    {
+        System.out.println( "send meta data" );
+        AggregatedResultSet agrs = new AggregatedResultSet();
+
+        DataValueSet dvs = new DataValueSet();
+        dvs.setDataSet( "Meta Data export" );
+        dvs.setOrgUnit( l.getName() );
+
+        ImportSummaries importSummaries = null;
+        Set<DataElementQuery> reportlist = report.getQueries();
+        for ( DataElementQuery eq : reportlist )
+        {
+            List<Object[]> metadataelements = Context.getService( DHIS2ReportingService.class )
+                .evaluateDataElementQueries( eq, l );
+            if ( destination.equals( "post" ) )
+            {
+                importSummaries = postMetaData( metadataelements, eq );
+                //need to get the uids from dhis2 for each element generated
+                List<String[]> uids = getDhis2Metadata( metadataelements, eq.getPrefix() );
+
+                for ( int i = 0; i < uids.size(); i++ )
+                {
+                    DataValue dv = new DataValue();
+                    dv.setDataElement( uids.get( i )[0] );
+                    dv.setDataElementName( uids.get( i )[0] );
+                    dv.setDataElementCode( uids.get( i )[1] );
+                    dv.setCategoryOptionComboName( "meta data" );
+                    dv.setValue( "sent" );
+                    dvs.addDataValue( dv );
+
+                    for ( MetaDataValueTemplate mdt : report.getMetaDataValueTemplates() )
+                    {
+                        System.out.println( "run " + uids.get( i )[0] + " '"
+                            + ((Integer) (metadataelements.get( i )[0])).intValue() + "' "
+                            + mdt.getDisaggregation().getName() );
+                        if ( !contains( report, uids.get( i )[0], mdt.getDisaggregation().getName() ) )
+                        {
+                            System.out.println( "ran" );
+                            DataElement element = Context.getService( DHIS2ReportingService.class )
+                                .getDataElementByCode( eq.getCodeprefix() + uids.get( i )[2] );
+                            System.out.println( element );
+                            if ( element == null )
+                            {
+                                element = new DataElement();
+                                element.setName( uids.get( i )[0] );
+                                element.setCode( eq.getCodeprefix() + uids.get( i )[2] );
+                                element.setUid( uids.get( i )[1] );
+                            }
+                            Context.getService( DHIS2ReportingService.class ).saveDataElement( element );
+                            DataValueTemplate data = new DataValueTemplate();
+                            data.setDisaggregation( mdt.getDisaggregation() );
+                            data.setDataelement( element );
+                            String query = mdt.getQuery();
+                            String newquery = query;
+                            int idcode = Integer.parseInt( uids.get( i )[2] );
+                            if ( query.contains( "#metaDataId" ) )
+                            {
+                                //(Integer) (metadataelements.get( i )[0])).intValue()
+                                newquery = query.replaceAll( "#metaDataId", idcode + "" );
+                            }
+                            data.setQuery( newquery );
+                            data.setReportDefinition( report );
+                            report.addDataValueTemplate( data );
+                        }
+
+                    }
+                }
+            }
+
+        }
+        System.out.println( dvs.getDataValues().size() );
+        System.out.println( importSummaries );
+        agrs.setDataValueSet( dvs );
+        agrs.setImportSummaries( importSummaries );
+        return agrs;
+    }
+
+    public ImportSummaries postReport( AdxType adxType )
+        throws DHIS2ReportingException
+    {
+        String standard = Context.getAdministrationService().getGlobalProperty( "dhisreport.dhis2Standard" );
+        ImportSummaries importSummaries = null;
+        if ( standard.equals( "adx" ) )
+        {
+            importSummaries = Context.getService( DHIS2ReportingService.class ).postAdxReport( adxType );
+        }
+        else
+        {
+            importSummaries = Context.getService( DHIS2ReportingService.class ).postDxf2Report( adxType );
+        }
+        return importSummaries;
+    }
+
+    public AggregatedResultSet sendReport( String mappingType, String destination, ReportDefinition report,
+        Period periodValue, Location l )
+        throws Exception
+    {
+        AggregatedResultSet agrs = new AggregatedResultSet();
+        // Set OrgUnit code into DataValueSet
+        DataValueSet dvs = null;
+        if ( mappingType.equalsIgnoreCase( "SQL" ) )
+        {
+            dvs = Context.getService( DHIS2ReportingService.class ).evaluateReportDefinition( report, periodValue, l );
+        }
+        else if ( mappingType.equalsIgnoreCase( "Reporting" ) )
+        {
+            dvs = Context.getService( DHIS2ReportingService.class ).generateReportingReportDefinition( report,
+                periodValue, l );
+        }
+
+        if ( dvs == null )
+        {
+            return agrs;
+        }
+
+        for ( LocationAttribute la : l.getActiveAttributes() )
+        {
+            if ( la.getAttributeType().getName().equals( "CODE" ) )
+                dvs.setOrgUnit( la.getValue().toString() );
+        }
+
+        //
+        List<DataValue> datavalue = dvs.getDataValues();
+        /*
+        Map<DataElement, String> deset = new HashMap<DataElement, String>();
+        for ( DataValue dv : datavalue )
+        {
+            DataElement detrmp = Context.getService( DHIS2ReportingService.class ).getDataElementByCode(
+                dv.getDataElement() );
+            deset.put( detrmp, dv.getValue() );
+            System.out.println( "dv value: " + dv.getValue() );
+        }
+         */
+        agrs.setDataValueSet( dvs );
+        //agrs.setDataElementMap( deset );
+        AdxType adxType = getAdxType( dvs, periodValue.getAsIsoString() );
+
+        //todo
+        //dvs.getDataValues().get(0).getCategoryOptionCombo();
+
+        if ( destination.equals( "post" ) )
+        {
+            ImportSummaries importSummaries = postReport( adxType );
+            if ( importSummaries != null )
+            {
+                agrs.setImportSummaries( importSummaries );
+            }
+        }
+        return agrs;
+    }
+
+    AdxType getAdxType( DataValueSet dvs, String timeperiod )
+    {
+        AdxType adxType = new AdxType();
+        adxType.setExported( dvs.getCompleteDate() );
+        GroupType gt = new GroupType();
+        List<DataValueType> dvTypeList = new ArrayList<DataValueType>();
+        for ( DataValue dv : dvs.getDataValues() )
+        {
+            DataValueType dvtype = new DataValueType();
+            dvtype.setDataElement( dv.getUid() );
+            dvtype.setValue( new BigDecimal( dv.getValue() ) );
+            dvtype.setCategoryOptionCombo( dv.getCategoryOptionCombo() );
+            dvtype.setAttributeOptionCombo( dv.getAttributeOptionCombo() );
+            dvTypeList.add( dvtype );
+        }
+        gt.getDataValue().addAll( dvTypeList );
+        gt.setOrgUnit( dvs.getOrgUnit() );
+        gt.setDataSet( dvs.getDataSet() );
+        gt.setPeriod( timeperiod );
+        adxType.getGroup().add( gt );
+        return adxType;
+    }
+
+    ImportSummaries postMetaData( List<Object[]> metadataelements, DataElementQuery eq )
+        throws DHIS2ReportingException
+    {
+        //todo generate metadata file
+        SimpleDateFormat dateFormat = new SimpleDateFormat( "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'" );
+        Date now = new Date();
+        String metadatafile = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
+        metadatafile += "<metaData xmlns=\"http://dhis2.org/schema/dxf/2.0\" created=\"" + dateFormat.format( now )
+            + "\">";
+        metadatafile += "<dataElements>";
+        for ( int i = 0; i < metadataelements.size(); i++ )
+        {
+            //fixed via kmri 1005
+            //turns out xml doesn't like ampersands in its string values
+            String metaDataElementName = (String) (metadataelements.get( i )[1]);
+            metaDataElementName = metaDataElementName.replaceAll( "&", "and" );
+
+            metadatafile += "<dataElement ";
+            metadatafile += "code=\"" + eq.getCodeprefix() + ((Integer) (metadataelements.get( i )[0])).intValue()
+                + "\" ";
+            metadatafile += "name=\"" + eq.getPrefix() + ": " + metaDataElementName + "\" ";
+            metadatafile += "shortName=\"" + eq.getPrefix() + ": " + metaDataElementName + "\" ";
+            metadatafile += ">";
+            metadatafile += "<externalAccess>false</externalAccess>";
+            metadatafile += "<aggregationType>SUM</aggregationType>";
+            metadatafile += "<dataDimension>true</dataDimension>";
+            metadatafile += "<valueType>INTEGER</valueType>";
+            metadatafile += "<domainType>AGGREGATE</domainType>";
+            metadatafile += "<url></url>";
+            metadatafile += "<categoryCombo name=\"" + eq.getDisaggregation().getName() + "\" id =\""
+                + eq.getDisaggregation().getUid() + "\" ></categoryCombo>";
+            metadatafile += "<zeroIsSignificant>false</zeroIsSignificant>";
+            metadatafile += "</dataElement>";
+        }
+        metadatafile += "</dataElements>";
+        metadatafile += "</metaData>";
+        //System.out.println( metadatafile );
+
+        return Context.getService( DHIS2ReportingService.class ).postMetaData( metadatafile );
+    }
+
+    public List<String[]> getDhis2Metadata( List<Object[]> metadata, String prefix )
+    {
+        return Context.getService( DHIS2ReportingService.class ).getDataElements( metadata, prefix );
+    }
+
+    public boolean contains( ReportDefinition report, String elementName, String disaggrigationName )
+    {
+        Iterator i = report.getDataValueTemplates().iterator();
+        while ( i.hasNext() )
+        {
+            DataValueTemplate value = (DataValueTemplate) i.next();
+            String test = value.getDataelement().getName();
+            String test2 = value.getDisaggregation().getName();
+            if ( test.equals( elementName ) && test2.equals( disaggrigationName ) )
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public Period monthly( String dateStr )
+        throws ParseException
+    {
+        Period period;
+        if ( dateStr.length() > 7 )
+            dateStr = replacedateStrMonth( dateStr );
+        dateStr = dateStr.concat( "-01" );
+
+        //System.out.println( "helloooooooooo1=====" + dateStr );
+        period = new MonthlyPeriod( new SimpleDateFormat( "yyyy-MM-dd" ).parse( dateStr ) );
+        // System.out.println( "helloooooooooo2=====" + period );
+
+        return period;
+    }
+
+    public Period weekly( String dateStr )
+        throws ParseException
+    {
+        Period period;
+        String finalweek;
+        String[] modify_week = dateStr.split( "W" );
+        Integer weekvalue = Integer.parseInt( dateStr.substring( dateStr.indexOf( 'W' ) + 1 ) ) + 1;
+        if ( weekvalue > 9 )
+        {
+            weekvalue = weekvalue == 54 ? 53 : weekvalue;
+            finalweek = modify_week[0].concat( "W" + weekvalue.toString() );
+        }
+        else
+        {
+            finalweek = modify_week[0].concat( "W0" + weekvalue.toString() );
+        }
+
+        period = new WeeklyPeriod( new SimpleDateFormat( "yyyy-'W'ww" ).parse( finalweek ) );
+
+        return period;
+    }
+
+    public Period daily( String dateStr )
+        throws ParseException
+    {
+        Period period;
+
+        period = new DailyPeriod( new SimpleDateFormat( "MM/dd/yyyy" ).parse( dateStr ) );
+
+        return period;
+    }
+
+    private String replacedateStrMonth( String dateStr )
+    {
+
+        String str = "";
+        // System.out.println( dateStr.substring( 5, 8 ) );
+
+        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Jan" ) )
+        {
+            //System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Jan", "01" );
+            // System.out.println( "converting date" + str );
+        }
+        else if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Feb" ) )
+        {
+            //  System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Feb", "02" );
+            //  System.out.println( "converting date" + str );
+        }
+        else if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Mar" ) )
+        {
+            // System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Mar", "03" );
+            // System.out.println( "converting date" + str );
+        }
+        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Apr" ) )
+        {
+            // System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Apr", "04" );
+            // System.out.println( "converting date" + str );
+        }
+        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "May" ) )
+        {
+            // System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "May", "05" );
+            // System.out.println( "converting date" + str );
+        }
+        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Jun" ) )
+        {
+            // System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Jun", "06" );
+            //  System.out.println( "converting date" + str );
+        }
+        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Jul" ) )
+        {
+            //  System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Jul", "07" );
+        }
+        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Aug" ) )
+        {
+            // System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Aug", "08" );
+            // System.out.println( "converting date" + str );
+        }
+        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Sep" ) )
+        {
+            //  System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Sep", "09" );
+            // System.out.println( "converting date" + str );
+        }
+        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Oct" ) )
+        {
+            // System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Oct", "10" );
+            // System.out.println( "converting date" + str );
+        }
+        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Nov" ) )
+        {
+            // System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Nov", "11" );
+            // System.out.println( "converting date" + str );
+        }
+        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Dec" ) )
+        {
+            // System.out.println( "converting date" );
+            str = dateStr.replaceFirst( "Dec", "12" );
+            //  System.out.println( "converting date" + str );
+        }
+
+        return str;
     }
 }

@@ -22,9 +22,14 @@ package org.openmrs.module.dhisreport.api.dhis;
 import org.hisp.dhis.dxf2.importsummary.ImportSummary;
 import org.openmrs.module.dhisreport.api.DHIS2ReportingException;
 import org.openmrs.module.dhisreport.api.adx.AdxType;
+import org.openmrs.module.dhisreport.api.dxf2.OrganizationUnit;
 import org.openmrs.module.dhisreport.api.importsummary.ImportSummaries;
 import org.openmrs.module.dhisreport.api.model.ReportDefinition;
 import org.openmrs.module.dhisreport.api.dxf2.DataValueSet;
+import org.openmrs.module.dhisreport.api.trackercapture.TrackedEntity;
+import org.openmrs.module.dhisreport.api.trackercapture.TrackerCaptureTemplateMessage;
+
+import java.util.List;
 
 /**
  * 
@@ -45,6 +50,29 @@ public interface Dhis2Server
 
     boolean isConfigured();
 
+    ImportSummaries postMetaData( String metaData )
+        throws DHIS2ReportingException;
+
+    List<TrackerCaptureTemplateMessage> postTrackerCapture( String trackerCapture )
+        throws Dhis2Exception;
+
+    ImportSummaries postEnrollment( String enrollmentMessage );
+
+    List<String[]> getDataElements( List<Object[]> elements, String prefix );
+
+    List<TrackedEntity> getTrackedEntities( String ouCode );
+
+    void deleteTrackerCapture( TrackedEntity entity );
+
+    void updateTrackerCapture( String entityMessage, TrackedEntity entity );
+
+    List<OrganizationUnit> getOrgUnits();
+
+    String getJson( String pageId );
+
+    String getOrgUnitCode()
+        throws Exception;
+
     ReportDefinition fetchReportTemplates()
         throws DHIS2ReportingException;
 
@@ -52,5 +80,8 @@ public interface Dhis2Server
         throws DHIS2ReportingException;
 
     ImportSummaries postAdxReport( AdxType report )
+        throws DHIS2ReportingException;
+
+    ImportSummaries postDxf2Report( AdxType report )
         throws DHIS2ReportingException;
 }

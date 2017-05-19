@@ -8,6 +8,7 @@
         <discriminator column="id" insert="false"/>
         <property column="disagg_name" name="name" unique="true"/>
         <property column="uid" name="uid" unique="true"/>
+        <property column="attributeOptionCombo_id" name="attributeOptionCombo" />
         <property column="code" name="code" unique="true"/>
     </class>
 </hibernate-mapping>

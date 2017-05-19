@@ -31,7 +31,25 @@ public class DataValue
     protected String dataElement;
 
     @XmlAttribute
+    protected String dataElementName;
+
+    @XmlAttribute
+    protected String dataElementCode;
+
+    @XmlAttribute
+    protected String uid;
+
+    @XmlAttribute
     protected String categoryOptionCombo;
+
+    @XmlAttribute
+    protected String categoryOptionComboName;
+
+    @XmlAttribute
+    protected String categoryOptionComboCode;
+
+    @XmlAttribute
+    protected String attributeOptionCombo;
 
     @XmlAttribute( required = true )
     protected String value;
@@ -75,6 +93,26 @@ public class DataValue
         this.dataElement = value;
     }
 
+    public String getDataElementName()
+    {
+        return dataElementName;
+    }
+
+    public void setDataElementName( String value )
+    {
+        this.dataElementName = value;
+    }
+
+    public String getDataElementCode()
+    {
+        return dataElementCode;
+    }
+
+    public void setDataElementCode( String value )
+    {
+        this.dataElementCode = value;
+    }
+
     /**
      * Gets the value of the categoryOptionCombo property.
      * 
@@ -97,6 +135,48 @@ public class DataValue
         this.categoryOptionCombo = value;
     }
 
+    public String getCategoryOptionComboName()
+    {
+        return categoryOptionComboName;
+    }
+
+    public void setCategoryOptionComboName( String value )
+    {
+        this.categoryOptionComboName = value;
+    }
+
+    public String getCategoryOptionComboCode()
+    {
+        return categoryOptionComboCode;
+    }
+
+    public void setCategoryOptionComboCode( String value )
+    {
+        this.categoryOptionComboCode = value;
+    }
+
+    /**
+     * Gets the value of the categoryOptionCombo property.
+     *
+     * @return possible object is {@link String }
+     *
+     */
+    public String getAttributeOptionCombo()
+    {
+        return attributeOptionCombo;
+    }
+
+    /**
+     * Sets the value of the categoryOptionCombo property.
+     *
+     * @param value allowed object is {@link String }
+     *
+     */
+    public void setAttributeOptionCombo( String value )
+    {
+        this.attributeOptionCombo = value;
+    }
+
     /**
      * Gets the value of the value property.
      * 
@@ -117,6 +197,16 @@ public class DataValue
     public void setValue( String value )
     {
         this.value = value;
+    }
+
+    public String getUid()
+    {
+        return uid;
+    }
+
+    public void setUid( String uid )
+    {
+        this.uid = uid;
     }
 
 }

@@ -75,4 +75,12 @@ public class WeeklyPeriod
         return new SimpleDateFormat( ISO_FORMAT ).format( getStartDate() );
     }
 
+    @Override
+    public Period getAsIsoStringNextValue( Integer nextValue )
+    {
+        Date date = getStartDate();
+        DateTime dt = new DateTime( date );
+        dt = dt.plusWeeks( nextValue );
+        return new WeeklyPeriod( dt.toDate() );
+    }
 }

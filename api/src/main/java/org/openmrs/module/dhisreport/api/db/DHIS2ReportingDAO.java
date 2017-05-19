@@ -20,16 +20,22 @@
 package org.openmrs.module.dhisreport.api.db;
 
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 import org.hibernate.SessionFactory;
 import org.openmrs.Location;
 import org.openmrs.module.dhisreport.api.DHIS2ReportingException;
 import org.openmrs.module.dhisreport.api.DHIS2ReportingService;
 import org.openmrs.module.dhisreport.api.model.DataElement;
+import org.openmrs.module.dhisreport.api.model.DataElementQuery;
 import org.openmrs.module.dhisreport.api.model.DataValueTemplate;
 import org.openmrs.module.dhisreport.api.model.Disaggregation;
 import org.openmrs.module.dhisreport.api.model.Identifiable;
 import org.openmrs.module.dhisreport.api.model.ReportDefinition;
+import org.openmrs.module.dhisreport.api.trackercapture.TrackerCaptureAttribute;
+import org.openmrs.module.dhisreport.api.trackercapture.TrackerCaptureEnrollment;
+import org.openmrs.module.dhisreport.api.trackercapture.TrackerCaptureTemplate;
 import org.openmrs.module.dhisreport.api.utils.Period;
 
 /**
@@ -39,6 +45,8 @@ public interface DHIS2ReportingDAO
 {
 
     public DataElement getDataElement( Integer id );
+
+    DataElementQuery getDataElementQueryByUid( String uid );
 
     public DataElement getDataElementByUid( String uid );
 
@@ -66,6 +74,8 @@ public interface DHIS2ReportingDAO
 
     public ReportDefinition getReportDefinitionByCode( String code );
 
+    public List<ReportDefinition> getReportDefinitionByPeriodType( String periodType );
+
     public ReportDefinition saveReportDefinition( ReportDefinition rd );
 
     public Collection<ReportDefinition> getAllReportDefinitions();
@@ -73,6 +83,9 @@ public interface DHIS2ReportingDAO
     public void deleteReportDefinition( ReportDefinition rd );
 
     public String evaluateDataValueTemplate( DataValueTemplate dvt, Period period, Location location )
+        throws DHIS2ReportingException;
+
+    public List<Object[]> evaluateDataElementQuery( DataElementQuery dq, Location location )
         throws DHIS2ReportingException;
 
     public DataValueTemplate getDataValueTemplate( Integer id );
@@ -91,4 +104,9 @@ public interface DHIS2ReportingDAO
 
     public Identifiable saveObject( Identifiable object );
 
+    public DataElementQuery getDataElementQuery( Integer id );
+
+    public DataElementQuery saveDataElementQuery( DataElementQuery de );
+
+    public void deleteDataElementQuery( DataElementQuery de );
 }

@@ -34,9 +34,11 @@ import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.dhisreport.api.DHIS2ReportingService;
+import org.openmrs.module.dhisreport.api.DHIS2TrackerCaptureService;
 import org.openmrs.module.dhisreport.api.model.DataValueTemplate;
 import org.openmrs.module.dhisreport.api.model.ReportDefinition;
 import org.openmrs.module.dhisreport.api.model.ReportTemplates;
+import org.openmrs.module.dhisreport.api.trackercapture.TrackerCaptureTemplate;
 import org.openmrs.web.WebConstants;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -68,27 +70,55 @@ public class ReportDefinitionController
     {
         HttpSession session = request.getSession();
         model.addAttribute( "user", Context.getAuthenticatedUser() );
+        DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
 
         MultipartHttpServletRequest multipartRequest = (MultipartHttpServletRequest) request;
         MultipartFile multipartFile = multipartRequest.getFile( "datafile" );
+        if ( multipartFile != null )
+        {
+            InputStream is = multipartFile.getInputStream();
+            try
+            {
+                service.unMarshallandSaveReportTemplates( is );
+                session.setAttribute( WebConstants.OPENMRS_MSG_ATTR, Context.getMessageSourceService().getMessage(
+                    "dhisreport.uploadSuccess" ) );
+            }
+            catch ( Exception ex )
+            {
+                log.error( "Error loading file: " + ex );
+                session.setAttribute( WebConstants.OPENMRS_ERROR_ATTR, Context.getMessageSourceService().getMessage(
+                    "dhisreport.uploadError" ) );
+                ex.printStackTrace();
+            }
+            finally
+            {
+                is.close();
+            }
+        }
 
-        DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
-        InputStream is = multipartFile.getInputStream();
-        try
+        MultipartFile multipartTrackerFile = multipartRequest.getFile( "trackerfile" );
+        if ( multipartTrackerFile != null )
         {
-            service.unMarshallandSaveReportTemplates( is );
-            session.setAttribute( WebConstants.OPENMRS_MSG_ATTR, Context.getMessageSourceService().getMessage(
-                "dhisreport.uploadSuccess" ) );
-        }
-        catch ( Exception ex )
-        {
-            log.error( "Error loading file: " + ex );
-            session.setAttribute( WebConstants.OPENMRS_ERROR_ATTR, Context.getMessageSourceService().getMessage(
-                "dhisreport.uploadError" ) );
-        }
-        finally
-        {
-            is.close();
+            InputStream istracker = multipartTrackerFile.getInputStream();
+            try
+            {
+                //todo
+                Context.getService( DHIS2TrackerCaptureService.class ).unMarshallandSaveTrackerCaptureTemplate(
+                    istracker );
+                session.setAttribute( WebConstants.OPENMRS_MSG_ATTR, Context.getMessageSourceService().getMessage(
+                    "dhisreport.uploadSuccess" ) );
+            }
+            catch ( Exception ex )
+            {
+                log.error( "Error loading file: " + ex );
+                session.setAttribute( WebConstants.OPENMRS_ERROR_ATTR, Context.getMessageSourceService().getMessage(
+                    "dhisreport.uploadError" ) );
+                ex.printStackTrace();
+            }
+            finally
+            {
+                istracker.close();
+            }
         }
     }
 
@@ -160,7 +190,7 @@ public class ReportDefinitionController
         //String url = "https://play.dhis2.org/demo/api/dataSets";
         String referer = webRequest.getHeader( "Referer" );
         HttpSession session = request.getSession();
-        
+
         try
         {
             DefaultHttpClient httpClient = new DefaultHttpClient();
@@ -177,7 +207,8 @@ public class ReportDefinitionController
 
             InputStream is = response.getEntity().getContent();
             try
-            {	DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
+            {
+                DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
                 service.unMarshallandSaveReportTemplates( is );
                 session.setAttribute( WebConstants.OPENMRS_MSG_ATTR, Context.getMessageSourceService().getMessage(
                     "dhisreport.uploadSuccess" ) );

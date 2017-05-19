@@ -20,10 +20,6 @@
 		</require_module>
 	</require_modules>
 	
-	<aware_of_modules>
-	    <aware_of_module>org.openmrs.module.legacyui</aware_of_module>
-	</aware_of_modules>
-	
     <!-- Module Activator -->
     <activator>${project.parent.groupId}.${project.parent.artifactId}.DHIS2ReportingActivator</activator>
 	
@@ -50,8 +46,14 @@
     <mappingFiles>
         ReportDefinition.hbm.xml
         DataElement.hbm.xml
+        DataElementQuery.hbm.xml
         Disaggregation.hbm.xml
         DataValueTemplate.hbm.xml
+        MetaDataValueTemplate.hbm.xml
+        Table.hbm.xml
+        TrackerCaptureAttribute.hbm.xml
+        TrackerCaptureReport.hbm.xml
+        TrackerCaptureEnrollment.hbm.xml
     </mappingFiles>
 	
 	<privilege>
@@ -85,7 +87,22 @@
 			The Password of the DHIS Server 
 		</description>
 	</globalProperty>
-		
+    <globalProperty>
+        <property>${project.parent.artifactId}.dhis2adx</property>
+        <defaultValue></defaultValue>
+        <description>
+            Use adx standard:
+        </description>
+    </globalProperty>
+    <globalProperty>
+        <property>${project.parent.artifactId}.dhis2dxf</property>
+        <defaultValue></defaultValue>
+        <description>
+            Use dxf 2 standard:
+        </description>
+    </globalProperty>
+
+
 	<globalProperty>
 		<property>${project.parent.artifactId}.dhis2SyncDate</property>
 		<defaultValue></defaultValue>

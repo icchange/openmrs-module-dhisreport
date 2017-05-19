@@ -25,10 +25,14 @@ import java.util.List;
 import javax.xml.bind.annotation.*;
 
 @XmlAccessorType( XmlAccessType.FIELD )
-@XmlType( name = "", propOrder = { "dataElements", "disaggregations", "reportDefinitions" } )
+@XmlType( name = "", propOrder = { "dataElementQuerys", "dataElements", "disaggregations", "reportDefinitions" } )
 @XmlRootElement( name = "reportTemplates" )
 public class ReportTemplates
 {
+
+    @XmlElementWrapper( name = "dataElementQuerys", required = false )
+    @XmlElement( name = "dataElementQuery", required = false )
+    protected List<DataElementQuery> dataElementQuerys;
 
     @XmlElementWrapper( name = "dataElements", required = true )
     @XmlElement( name = "dataElement" )
@@ -40,6 +44,20 @@ public class ReportTemplates
 
     @XmlElement( name = "reportTemplate", required = true )
     protected List<ReportDefinition> reportDefinitions;
+
+    public List<DataElementQuery> getDataElementQuerys()
+    {
+        return dataElementQuerys;
+    }
+
+    public void setDataElementQuerys( Collection<DataElementQuery> dataElementQuerys )
+    {
+        this.dataElementQuerys = new ArrayList<DataElementQuery>();
+        for ( DataElementQuery dq : dataElementQuerys )
+        {
+            this.dataElementQuerys.add( dq );
+        }
+    }
 
     public List<DataElement> getDataElements()
     {

@@ -42,7 +42,20 @@
                 code="dhisreport.syncReports" /></a>
     </li>
      -->
-
+	<openmrs:hasPrivilege privilege="Manage Dhisreport">
+	<li
+        <c:if test='<%=request.getRequestURI().contains("/tableAdmin")%>'>class="active"</c:if>>
+            <a
+                href="${pageContext.request.contextPath}/module/dhisreport/tableAdmin.form"><spring:message
+                code="dhisreport.tableAdmin" /></a>
+    </li>
+	</openmrs:hasPrivilege>
+	<li
+        <c:if test='<%=request.getRequestURI().contains("/tableView")%>'>class="active"</c:if>>
+            <a
+                href="${pageContext.request.contextPath}/module/dhisreport/tableView.form"><spring:message
+                code="dhisreport.tableView" /></a>
+    </li>
 
     <!-- Add further links here -->
 </ul>

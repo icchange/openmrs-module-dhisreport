@@ -21,7 +21,10 @@ package org.openmrs.module.dhisreport.api;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.text.ParseException;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 import org.openmrs.module.dhisreport.api.adx.AdxType;
 import org.openmrs.module.dhisreport.api.db.DHIS2ReportingDAO;
@@ -30,6 +33,9 @@ import org.hisp.dhis.dxf2.importsummary.ImportSummary;
 import org.openmrs.Location;
 import org.openmrs.api.OpenmrsService;
 import org.openmrs.module.dhisreport.api.dhis.HttpDhis2Server;
+import org.openmrs.module.dhisreport.api.exceptions.LocationException;
+import org.openmrs.module.dhisreport.api.exceptions.SendMetaDataException;
+import org.openmrs.module.dhisreport.api.exceptions.SendReportException;
 import org.openmrs.module.dhisreport.api.importsummary.ImportSummaries;
 import org.openmrs.module.dhisreport.api.model.*;
 import org.openmrs.module.dhisreport.api.utils.Period;
@@ -83,9 +89,28 @@ public interface DHIS2ReportingService
     public ImportSummaries postAdxReport( AdxType adxReport )
         throws DHIS2ReportingException;
 
+    public ImportSummaries postDxf2Report( AdxType adxReport )
+        throws DHIS2ReportingException;
+
     // -----------------------------------------------------------------------
     // Data access methods
     // -----------------------------------------------------------------------
+
+    ImportSummaries postMetaData( String metadata )
+        throws DHIS2ReportingException;
+
+    List<String[]> getDataElements( List<Object[]> elements, String prefix );
+
+    DataElementQuery getDataElementQuery( Integer id );
+
+    DataElementQuery getDataElementQueryByUid( String uid );
+
+    DataElementQuery getDataElementQueryByCode( String code );
+
+    DataElementQuery saveDataElementQuery( DataElementQuery dq );
+
+    void purgeDataElementQuery( DataElementQuery dq );
+
     /**
      * @param id
      * @return
@@ -165,6 +190,9 @@ public interface DHIS2ReportingService
     @Transactional( readOnly = true )
     public ReportDefinition getReportDefinitionByCode( String code );
 
+    @Transactional( readOnly = true )
+    public List<ReportDefinition> getReportDefinitionByPeriodType( String PeriodType );
+
     /**
      * @param reportDefinition
      * @return
@@ -213,6 +241,7 @@ public interface DHIS2ReportingService
     // -----------------------------------------------------------------------
     // ReportEvaluation
     // -----------------------------------------------------------------------
+
     /**
      * @param dv
      * @param period
@@ -221,6 +250,8 @@ public interface DHIS2ReportingService
      */
     String evaluateDataValueTemplate( DataValueTemplate dv, Period period, Location location )
         throws DHIS2ReportingException;
+
+    List<Object[]> evaluateDataElementQueries( DataElementQuery dataElementQuery, Location location );
 
     /**
      * @param reportDefinition
@@ -257,5 +288,13 @@ public interface DHIS2ReportingService
     public Location getLocationByOrgUnitCode( String orgUnitCode );
 
     public DHIS2ReportingDAO getDao();
+
+    List<AggregatedResultSet> postReportDefinition( int reportIt, String destination, String freq, String dateStr,
+        int consecutive, String mappingType )
+        throws ParseException, LocationException, SendMetaDataException, SendReportException;
+
+    List<AggregatedResultSet> postBulkReportDefinition( String reportType, String destination, String freq,
+        String dateStr, int consecutive, String mappingType )
+        throws ParseException, LocationException, SendMetaDataException, SendReportException;
 
 }

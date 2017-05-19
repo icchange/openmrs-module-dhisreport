@@ -50,6 +50,12 @@ public class DataValueType
     @XmlAttribute( name = "value", required = true )
     protected BigDecimal value;
 
+    @XmlAttribute( name = "CategoryOptionCombo", required = true )
+    protected String categoryOptionCombo;
+
+    @XmlAttribute( name = "AttributeOptionCombo", required = false )
+    protected String attributeOptionCombo;
+
     @XmlAnyAttribute
     private Map<QName, String> otherAttributes = new HashMap<QName, String>();
 
@@ -77,6 +83,26 @@ public class DataValueType
     public void setAnnotation( Object value )
     {
         this.annotation = value;
+    }
+
+    public String getCategoryOptionCombo()
+    {
+        return categoryOptionCombo;
+    }
+
+    public void setCategoryOptionCombo( String categoryOption )
+    {
+        this.categoryOptionCombo = categoryOption;
+    }
+
+    public String getAttributeOptionCombo()
+    {
+        return attributeOptionCombo;
+    }
+
+    public void setAttributeOptionCombo( String attributeOption )
+    {
+        this.attributeOptionCombo = attributeOption;
     }
 
     /**

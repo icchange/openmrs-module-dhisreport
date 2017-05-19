@@ -41,6 +41,19 @@
         return "${pageContext.request.contextPath}";
     }
 
+	TRACKERCAPTURE = {
+	        deleteTrackerCapture: function(id) {
+                if (confirm("<spring:message code="dhisreport.rus" />")) {
+                    var link = getContextPath() + "/module/dhisreport/deleteTrackerCapture.htm?trackerCapture_id=" + id;
+                    if (opener != undefined) {
+                        jQuery(opener.location).attr({href: link});
+                    } else {
+                        jQuery(location).attr({href: link});
+                    }
+                }
+            }
+	};
+
     REPORTDEFINITION = {
         edit: function(id) {
             jQuery("#reportDefinition_edit" + id).hide();

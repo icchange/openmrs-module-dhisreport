@@ -46,6 +46,9 @@ public class Disaggregation
     @XmlAttribute( required = true )
     protected String name;
 
+    @XmlAttribute( required = false )
+    protected String attributeOptionCombo;
+
     @Override
     public Integer getId()
     {
@@ -88,6 +91,16 @@ public class Disaggregation
     public void setUid( String uid )
     {
         this.uid = uid;
+    }
+
+    public String getAttributeOptionCombo()
+    {
+        return attributeOptionCombo;
+    }
+
+    public void setAttributeOptionCombo( String attributeOptionCombo )
+    {
+        this.attributeOptionCombo = attributeOptionCombo;
     }
 
     @Override

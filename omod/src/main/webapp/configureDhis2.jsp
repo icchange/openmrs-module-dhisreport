@@ -28,6 +28,14 @@
                 <td><input name="password" type="password" size="20" value="${dhis2Server.password}"/></td>
             </tr>
             <tr>
+                <td><spring:message code="dhisreport.dhis2adx" /></td>
+                <td><input name="standard" type="radio" value="adx" <c:if test="${dhis2Server.standard == 'adx'}">checked</c:if>  /></td>
+            </tr>
+            <tr>
+                <td><spring:message code="dhisreport.dhis2dxf" /></td>
+                <td><input name="standard" type="radio" value="dxf" <c:if test="${dhis2Server.standard == 'dxf'}">checked</c:if> /></td>
+            </tr>
+            <tr>
                 <td />
                 <td><input name="submit" type="submit" value="<spring:message code="dhisreport.dhis2saveButton" />" /></td>
             </tr>

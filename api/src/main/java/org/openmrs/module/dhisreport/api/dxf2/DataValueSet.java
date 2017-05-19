@@ -104,6 +104,11 @@ public class DataValueSet
         return this.dataValue;
     }
 
+    public void addDataValue( DataValue value )
+    {
+        dataValue.add( value );
+    }
+
     public String getDataElementIdScheme()
     {
         return dataElementIdScheme;

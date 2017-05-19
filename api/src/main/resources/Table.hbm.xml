@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN" "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping package="org.openmrs.module.dhisreport.api.table">
+    <class name="TableDhis2" table="${project.parent.artifactId}_table">
+        <id column="id" name="id" unsaved-value="0">
+            <generator class="native"/>
+        </id>
+        <discriminator column="id" insert="false"/>
+        <property column="uid" name="uid" unique="true"/>
+        <property column="name" name="name" unique="true"/>
+        <property column="href" name="href"/>
+        <set name="roles" table="${project.parent.artifactId}_table_role">
+            <key column="table_id"/>
+            <many-to-many column="role_name"
+                          unique="true"
+                          class="org.openmrs.Role"/>
+        </set>
+    </class>
+</hibernate-mapping>

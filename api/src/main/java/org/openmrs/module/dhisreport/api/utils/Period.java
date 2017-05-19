@@ -37,4 +37,6 @@ public interface Period
 
     public String getAsIsoString();
 
+    public Period getAsIsoStringNextValue( Integer nextValue );
+
 }

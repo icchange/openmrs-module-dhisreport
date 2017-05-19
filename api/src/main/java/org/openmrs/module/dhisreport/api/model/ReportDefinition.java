@@ -33,7 +33,7 @@ import javax.xml.bind.annotation.*;
  * @author bobj
  */
 @XmlAccessorType( XmlAccessType.FIELD )
-@XmlType( name = "", propOrder = { "name", "uid", "code", "periodType", "dataValueTemplates" } )
+@XmlType( name = "", propOrder = { "name", "uid", "code", "periodType", "metaDataValueTemplates", "dataValueTemplates" } )
 @XmlRootElement( name = "reportTemplate" )
 public class ReportDefinition
     implements Serializable, Identifiable
@@ -64,8 +64,18 @@ public class ReportDefinition
     @XmlElement( name = "dataValueTemplate" )
     protected Set<DataValueTemplate> dataValueTemplates = new HashSet<DataValueTemplate>();
 
+    @XmlElementWrapper( name = "metaDataValueTemplates" )
+    @XmlElement( name = "metaDataValueTemplate" )
+    protected Set<MetaDataValueTemplate> metaDataValueTemplates = new HashSet<MetaDataValueTemplate>();
+
+    @XmlTransient
+    protected Set<DataElementQuery> queries = new HashSet<DataElementQuery>();
+
     @XmlTransient
     protected String reportingReportId;
+
+    @XmlTransient
+    protected Boolean scheduled;
 
     @Override
     public Integer getId()
@@ -132,6 +142,48 @@ public class ReportDefinition
         dataValueTemplates.remove( id );
     }
 
+    public Set<MetaDataValueTemplate> getMetaDataValueTemplates()
+    {
+        return metaDataValueTemplates;
+    }
+
+    public void setMetaDataValueTemplates( Set<MetaDataValueTemplate> metaDataValueTemplates )
+    {
+        this.metaDataValueTemplates = metaDataValueTemplates;
+    }
+
+    public void addMetaDataValueTemplate( MetaDataValueTemplate metaDataValueTemplate )
+    {
+        metaDataValueTemplate.setReportDefinition( this );
+        metaDataValueTemplates.add( metaDataValueTemplate );
+    }
+
+    public void removeMetaDataValueTemplate( MetaDataValueTemplate metaDataValueTemplate )
+    {
+        metaDataValueTemplates.remove( id );
+    }
+
+    public Set<DataElementQuery> getQueries()
+    {
+        return queries;
+    }
+
+    public void setQueries( Set<DataElementQuery> dataElementQuery )
+    {
+        this.queries = dataElementQuery;
+    }
+
+    public void addQueries( DataElementQuery dataElementQuery )
+    {
+        dataElementQuery.setReportDefinition( this );
+        queries.add( dataElementQuery );
+    }
+
+    public void removeQueries( DataElementQuery dataElementQuery )
+    {
+        queries.remove( id );
+    }
+
     @Override
     public boolean equals( Object obj )
     {
@@ -189,4 +241,13 @@ public class ReportDefinition
         this.reportingReportId = reportingReportId;
     }
 
+    public Boolean getScheduled()
+    {
+        return scheduled;
+    }
+
+    public void setScheduled( Boolean scheduled )
+    {
+        this.scheduled = scheduled;
+    }
 }

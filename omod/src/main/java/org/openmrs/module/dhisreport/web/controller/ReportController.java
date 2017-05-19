@@ -24,10 +24,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -39,6 +36,7 @@ import org.openmrs.api.context.Context;
 import org.openmrs.module.dhisreport.api.AggregatedResultSet;
 import org.openmrs.module.dhisreport.api.DHIS2ReportingException;
 import org.openmrs.module.dhisreport.api.DHIS2ReportingService;
+import org.openmrs.module.dhisreport.api.DHIS2TrackerCaptureService;
 import org.openmrs.module.dhisreport.api.adx.AdxType;
 import org.openmrs.module.dhisreport.api.adx.DataValueType;
 import org.openmrs.module.dhisreport.api.adx.GroupType;
@@ -46,11 +44,17 @@ import org.openmrs.module.dhisreport.api.dhis.Dhis2Server;
 import org.openmrs.module.dhisreport.api.dhis.HttpDhis2Server;
 import org.openmrs.module.dhisreport.api.dxf2.DataValue;
 import org.openmrs.module.dhisreport.api.dxf2.DataValueSet;
+import org.openmrs.module.dhisreport.api.exceptions.LocationException;
+import org.openmrs.module.dhisreport.api.exceptions.SendMetaDataException;
+import org.openmrs.module.dhisreport.api.exceptions.SendReportException;
 import org.openmrs.module.dhisreport.api.importsummary.ImportSummaries;
-import org.openmrs.module.dhisreport.api.model.DataElement;
+import org.openmrs.module.dhisreport.api.model.*;
+import org.openmrs.module.dhisreport.api.utils.DailyPeriod;
 import org.openmrs.module.dhisreport.api.utils.MonthlyPeriod;
 import org.openmrs.module.dhisreport.api.utils.Period;
 import org.openmrs.module.dhisreport.api.utils.WeeklyPeriod;
+import org.openmrs.module.reporting.report.Report;
+import org.openmrs.util.LocationUtility;
 import org.openmrs.web.WebConstants;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -82,9 +86,10 @@ public class ReportController
     public void listReports( ModelMap model )
     {
         DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
-
+        DHIS2TrackerCaptureService tcservice = Context.getService( DHIS2TrackerCaptureService.class );
         model.addAttribute( "user", Context.getAuthenticatedUser() );
         model.addAttribute( "reportDefinitions", service.getAllReportDefinitions() );
+        model.addAttribute( "TrackerCaptureTemplates", tcservice.getAllTrackerCaptureTemplates() );
     }
 
     @RequestMapping( value = "/module/dhisreport/setupReport", method = RequestMethod.GET )
@@ -99,6 +104,226 @@ public class ReportController
         model.addAttribute( "reportDefinition", service.getReportDefinition( reportDefinition_id ) );
         model.addAttribute( "locations", Context.getLocationService().getAllLocations() );
         model.addAttribute( "errorMessage", errormsg );
+
+        HttpDhis2Server server = setupServer( service );
+        if ( (server != null) & (server.isConfigured()) )
+        {
+            model.addAttribute( "dhis2Server", server );
+        }
+    }
+
+    @RequestMapping( value = "/module/dhisreport/setupBulkReport", method = RequestMethod.GET )
+    public void setupBulkReport( ModelMap model, @RequestParam( value = "type", required = false )
+    String reportType, HttpSession session )
+    {
+        DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
+        String errormsg = (String) session.getAttribute( "errorMessage" );
+        session.removeAttribute( "errorMessage" );
+
+        model.addAttribute( "user", Context.getAuthenticatedUser() );
+        model.addAttribute( "reportDefinitions", service.getReportDefinitionByPeriodType( reportType ) );
+        model.addAttribute( "reportType", reportType );
+        model.addAttribute( "locations", Context.getLocationService().getAllLocations() );
+        model.addAttribute( "errorMessage", errormsg );
+
+        HttpDhis2Server server = setupServer( service );
+        if ( (server != null) & (server.isConfigured()) )
+        {
+            model.addAttribute( "dhis2Server", server );
+        }
+    }
+
+    @RequestMapping( value = "/module/dhisreport/executeReport", method = RequestMethod.POST )
+    public String executeReport( ModelMap model, @RequestParam( value = "reportDefinition_id", required = true )
+    Integer reportDefinition_id, @RequestParam( value = "location", required = false )
+    String OU_Code, @RequestParam( value = "resultDestination", required = true )
+    String destination, @RequestParam( value = "date", required = true )
+    String dateStr, @RequestParam( value = "frequency", required = true )
+    String freq, @RequestParam( value = "consecutive", required = true )
+    Integer consecutive, @RequestParam( value = "mappingType", required = true )
+    String mappingType, WebRequest webRequest, HttpServletRequest request )
+        throws Exception
+    {
+        System.out.println( "execute report start" );
+        List<AggregatedResultSet> aggregatedList = null;
+        try
+        {
+            aggregatedList = Context.getService( DHIS2ReportingService.class ).postReportDefinition(
+                reportDefinition_id, destination, freq, dateStr, consecutive, mappingType );
+        }
+        catch ( ParseException pex )
+        {
+            return "redirect:" + logDateError( webRequest, pex );
+        }
+        catch ( LocationException e )
+        {
+            return "redirect:" + logLocationError( webRequest, request );
+        }
+        catch ( SendMetaDataException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( SendReportException e )
+        {
+            e.printStackTrace();
+        }
+
+        //sort aggregatedList values
+        for ( AggregatedResultSet agrs : aggregatedList )
+        {
+            Collections.sort( agrs.getDataValueSet().getDataValues(), new Comparator<DataValue>()
+            {
+                public int compare( DataValue d1, DataValue d2 )
+                {
+
+                    int order = d1.getDataElement().compareTo( d2.getDataElement() );
+                    if ( order == 0 )
+                    {
+                        return d1.getCategoryOptionComboName().compareTo( d2.getCategoryOptionComboName() );
+                    }
+                    else
+                    {
+                        return order;
+                    }
+                }
+            } );
+        }
+
+        System.out.println( "execute report finished" );
+
+        model.addAttribute( "user", Context.getAuthenticatedUser() );
+        model.addAttribute( "aggregatedList", aggregatedList );
+        return null;
+    }
+
+    @RequestMapping( value = "/module/dhisreport/executeBulkReport", method = RequestMethod.POST )
+    public String executeBulkReport( ModelMap model, @RequestParam( value = "reportType", required = true )
+    String reportType, @RequestParam( value = "location", required = false )
+    String OU_Code, @RequestParam( value = "resultDestination", required = true )
+    String destination, @RequestParam( value = "date", required = true )
+    String dateStr, @RequestParam( value = "frequency", required = true )
+    String freq, @RequestParam( value = "consecutive", required = true )
+    Integer consecutive, @RequestParam( value = "mappingType", required = true )
+    String mappingType, WebRequest webRequest, HttpServletRequest request )
+        throws Exception
+    {
+        List<AggregatedResultSet> aggregatedList = null;
+        try
+        {
+            aggregatedList = Context.getService( DHIS2ReportingService.class ).postBulkReportDefinition( reportType,
+                destination, freq, dateStr, consecutive, mappingType );
+        }
+        catch ( ParseException pex )
+        {
+            return "redirect:" + logDateError( webRequest, pex );
+        }
+        catch ( LocationException e )
+        {
+            return "redirect:" + logLocationError( webRequest, request );
+        }
+        catch ( SendMetaDataException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( SendReportException e )
+        {
+            e.printStackTrace();
+        }
+
+        /*
+        DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
+
+        //get a period from the date string
+        Period period = null;
+        try
+        {
+            period = getPeriodFromDateString( freq, dateStr );
+        }
+        catch ( ParseException pex )
+        {
+            return "redirect:" + logDateError( webRequest, pex );
+        }
+
+        //get period list of consecutive dates after current period up to consecutive value limit
+        List<Period> periodList = generatePeriodList( period, consecutive );
+
+        // Get Location by OrgUnit Code
+        List<Location> locationListFinal = null;
+        try
+        {
+            locationListFinal = getValidLocationList();
+        }
+        catch ( Exception e )
+        {
+            return "redirect:" + logLocationError( webRequest, request );
+        }
+
+        List<AggregatedResultSet> aggregatedList = new ArrayList<AggregatedResultSet>();
+        //run reports and metadata
+        for ( Location l : locationListFinal )
+        {
+            for ( Period periodValue : periodList )
+            {
+                List<ReportDefinition> definitionList = service.getReportDefinitionByPeriodType( reportType );
+                for ( ReportDefinition r : definitionList )
+                {
+                    //send meta data
+                    aggregatedList.add( sendMetadata( destination, r, l ) );
+                    //send report
+                    aggregatedList.add( sendReport( mappingType, destination, r, periodValue, l ) );
+                }
+            }
+        }
+         */
+        model.addAttribute( "user", Context.getAuthenticatedUser() );
+        model.addAttribute( "aggregatedList", aggregatedList );
+        return null;
+    }
+
+    @RequestMapping( value = "/module/dhisreport/syncReports", method = RequestMethod.GET )
+    public void syncReports( ModelMap model )
+    {
+        DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
+
+        model.addAttribute( "user", Context.getAuthenticatedUser() );
+        model.addAttribute( "reportDefinitions", service.getAllReportDefinitions() );
+    }
+
+    public String logDateError( WebRequest webRequest, ParseException pex )
+    {
+        log.error( "Cannot convert passed string to date... Please check dateFormat", pex );
+        webRequest.setAttribute( WebConstants.OPENMRS_ERROR_ATTR, Context.getMessageSourceService().getMessage(
+            "Date Parsing Error" ), WebRequest.SCOPE_SESSION );
+        String referer = webRequest.getHeader( "Referer" );
+        return referer;
+    }
+
+    public String logLocationError( WebRequest webRequest, HttpServletRequest request )
+    {
+        log.error( "Location attribute CODE not set" );
+        request.getSession().setAttribute( "errorMessage", "Please set location attribute CODE to generate results." );
+        String referer = webRequest.getHeader( "Referer" );
+        return referer;
+    }
+
+    public String logSendMetaDataError( WebRequest webRequest, HttpServletRequest request )
+    {
+        log.error( "Meta Data Error" );
+        request.getSession().setAttribute( "errorMessage", "Meta Data sending had an Error." );
+        String referer = webRequest.getHeader( "Referer" );
+        return referer;
+    }
+
+    public String logReportError( WebRequest webRequest, HttpServletRequest request )
+    {
+        log.error( "Report Error" );
+        request.getSession().setAttribute( "errorMessage", "Report sending had an Error." );
+        String referer = webRequest.getHeader( "Referer" );
+        return referer;
+    }
+
+    public HttpDhis2Server setupServer( DHIS2ReportingService service )
+    {
 
         String dhisurl = Context.getAdministrationService().getGlobalProperty( "dhisreport.dhis2URL" );
         String dhisusername = Context.getAdministrationService().getGlobalProperty( "dhisreport.dhis2UserName" );
@@ -120,339 +345,7 @@ public class ReportController
         server.setUsername( dhisusername );
         server.setPassword( dhispassword );
 
-        if ( (server != null) & (server.isConfigured()) )
-        {
-            model.addAttribute( "dhis2Server", server );
-        }
-    }
-
-    @RequestMapping( value = "/module/dhisreport/executeReport", method = RequestMethod.POST )
-    public String executeReport( ModelMap model, @RequestParam( value = "reportDefinition_id", required = true )
-    Integer reportDefinition_id, @RequestParam( value = "location", required = false )
-    String OU_Code, @RequestParam( value = "resultDestination", required = true )
-    String destination, @RequestParam( value = "date", required = true )
-    String dateStr, @RequestParam( value = "frequency", required = true )
-    String freq, @RequestParam( value = "mappingType", required = true )
-    String mappingType, WebRequest webRequest, HttpServletRequest request )
-        throws Exception
-    {
-        DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
-        Period period = null;
-        //System.out.println( "freeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" + freq );
-        //System.out.println( "dasdasssssssssssssssssssss" + dateStr );
-
-        if ( freq.equalsIgnoreCase( "monthly" ) )
-        {
-            if ( dateStr.length() > 7 )
-                dateStr = replacedateStrMonth( dateStr );
-            dateStr = dateStr.concat( "-01" );
-            try
-            {
-                //System.out.println( "helloooooooooo1=====" + dateStr );
-                period = new MonthlyPeriod( new SimpleDateFormat( "yyyy-MM-dd" ).parse( dateStr ) );
-                // System.out.println( "helloooooooooo2=====" + period );
-            }
-            catch ( ParseException pex )
-            {
-                log.error( "Cannot convert passed string to date... Please check dateFormat", pex );
-                webRequest.setAttribute( WebConstants.OPENMRS_ERROR_ATTR, Context.getMessageSourceService().getMessage(
-                    "Date Parsing Error" ), WebRequest.SCOPE_SESSION );
-                return null;
-            }
-        }
-        if ( freq.equalsIgnoreCase( "weekly" ) )
-        {
-            try
-            {
-                String finalweek = "";
-                String[] modify_week = dateStr.split( "W" );
-                Integer weekvalue = Integer.parseInt( dateStr.substring( dateStr.indexOf( 'W' ) + 1 ) ) + 1;
-                if ( weekvalue > 9 )
-                {
-                    weekvalue = weekvalue == 54 ? 53 : weekvalue;
-                    finalweek = modify_week[0].concat( "W" + weekvalue.toString() );
-                }
-                else
-                {
-                    finalweek = modify_week[0].concat( "W0" + weekvalue.toString() );
-                }
-
-                period = new WeeklyPeriod( new SimpleDateFormat( "yyyy-'W'ww" ).parse( finalweek ) );
-            }
-            catch ( ParseException ex )
-            {
-                log.error( "Cannot convert passed string to date... Please check dateFormat", ex );
-                webRequest.setAttribute( WebConstants.OPENMRS_ERROR_ATTR, Context.getMessageSourceService().getMessage(
-                    "Date Parsing Error" ), WebRequest.SCOPE_SESSION );
-                return null;
-            }
-        }
-        if ( freq.equalsIgnoreCase( "daily" ) )
-        {
-
-            webRequest.setAttribute( WebConstants.OPENMRS_ERROR_ATTR, Context.getMessageSourceService().getMessage(
-                "dhisreport.dateFormatError" ), WebRequest.SCOPE_SESSION );
-            return null;
-
-        }
-
-        // Get Location by OrgUnit Code
-        //Location location = service.getLocationByOU_Code( OU_Code );
-        // System.out.println( "helloooooooooo3=====" + period );
-        List<DataValueSet> dvsList = new ArrayList<DataValueSet>();
-        List<Location> locationList = new ArrayList<Location>();
-        List<Location> locationListFinal = new ArrayList<Location>();
-        //locationList.add( location );
-        //locationList.add( service.getLocationByOU_Code( "Gahombo" ) );
-        locationList.addAll( Context.getLocationService().getAllLocations() );
-
-        //remove locations without Organization Unit codes
-        for ( Location l : locationList )
-        {
-            for ( LocationAttribute la : l.getActiveAttributes() )
-            {
-                if ( la.getAttributeType().getName().equals( "CODE" ) )
-                {
-                    //System.out.println( "Name-----" + la.getAttributeType().getName() + "Value---" + la.getValue() );
-                    if ( !la.getValue().toString().isEmpty() && la.getValue().toString() != null )
-                    {
-                        locationListFinal.add( l );
-                        break;
-                    }
-
-                }
-
-            }
-        }
-
-        Map<String, Map> desetList = new HashMap<String, Map>();
-        List<AggregatedResultSet> aggregatedList = new ArrayList<AggregatedResultSet>();
-        if ( locationListFinal.isEmpty() && !locationList.isEmpty() )
-        {
-            log.error( "Location attribute CODE not set" );
-            request.getSession().setAttribute( "errorMessage",
-                "Please set location attribute CODE to generate results." );
-            String referer = webRequest.getHeader( "Referer" );
-            return "redirect:" + referer;
-        }
-
-        if ( mappingType.equalsIgnoreCase( "SQL" ) )
-        {
-            for ( Location l : locationListFinal )
-            {
-                AggregatedResultSet agrs = new AggregatedResultSet();
-                DataValueSet dvs = service.evaluateReportDefinition(
-                    service.getReportDefinition( reportDefinition_id ), period, l );
-                for ( LocationAttribute la : l.getActiveAttributes() )
-                {
-                    if ( la.getAttributeType().getName().equals( "CODE" ) )
-                        dvs.setOrgUnit( la.getValue().toString() );
-                }
-                // Set OrgUnit code into DataValueSet
-
-                List<DataValue> datavalue = dvs.getDataValues();
-                Map<DataElement, String> deset = new HashMap<DataElement, String>();
-                for ( DataValue dv : datavalue )
-                {
-
-                    DataElement detrmp = service.getDataElementByCode( dv.getDataElement() );
-                    // System.out.println( detrmp.getName() + detrmp.getCode() );
-                    deset.put( detrmp, dv.getValue() );
-                }
-                agrs.setDataValueSet( dvs );
-                agrs.setDataElementMap( deset );
-                AdxType adxType = getAdxType( dvs, dateStr );
-
-                if ( destination.equals( "post" ) )
-                {
-                    ImportSummaries importSummaries = Context.getService( DHIS2ReportingService.class ).postAdxReport(
-                        adxType );
-                    agrs.setImportSummaries( importSummaries );
-                }
-                aggregatedList.add( agrs );
-            }
-        }
-
-        if ( mappingType.equalsIgnoreCase( "Reporting" ) )
-        {
-            for ( Location l : locationListFinal )
-            {
-                AggregatedResultSet agrs = new AggregatedResultSet();
-                DataValueSet dvs = service.generateReportingReportDefinition( service
-                    .getReportDefinition( reportDefinition_id ), period, l );
-                for ( LocationAttribute la : l.getActiveAttributes() )
-                {
-                    if ( la.getAttributeType().getName().equals( "CODE" ) )
-                        dvs.setOrgUnit( la.getValue().toString() );
-                }
-                List<DataValue> datavalue = dvs.getDataValues();
-                Map<DataElement, String> deset = new HashMap<DataElement, String>();
-                for ( DataValue dv : datavalue )
-                {
-
-                    DataElement detrmp = service.getDataElementByCode( dv.getDataElement() );
-                    // System.out.println( detrmp.getName() + detrmp.getCode() );
-                    deset.put( detrmp, dv.getValue() );
-                }
-                agrs.setDataValueSet( dvs );
-                agrs.setDataElementMap( deset );
-                AdxType adxType = getAdxType( dvs, dateStr );
-
-                if ( destination.equals( "post" ) )
-                {
-                    ImportSummaries importSummaries = Context.getService( DHIS2ReportingService.class ).postAdxReport(
-                        adxType );
-                    agrs.setImportSummaries( importSummaries );
-                }
-                aggregatedList.add( agrs );
-            }
-        }
-        model.addAttribute( "user", Context.getAuthenticatedUser() );
-        model.addAttribute( "aggregatedList", aggregatedList );
-        return null;
-    }
-
-    // @RequestMapping(value = "/module/dhisreport/executeReport", method =
-    // RequestMethod.POST)
-    // public void saveReport( ModelMap model,
-    // @RequestParam(value = "reportDefinition_id", required = true) Integer
-    // reportDefinition_id,
-    // @RequestParam(value = "location", required = true) Integer location_id,
-    // @RequestParam(value = "resultDestination", required = true) String
-    // destination,
-    // @RequestParam(value = "date", required = true) String dateStr,
-    // HttpServletResponse response )
-    // throws ParseException, IOException, JAXBException,
-    // DHIS2ReportingException
-    // {
-    // DHIS2ReportingService service = Context.getService(
-    // DHIS2ReportingService.class );
-    //
-    // MonthlyPeriod period = new MonthlyPeriod( new SimpleDateFormat(
-    // "yyyy-MM-dd" ).parse( dateStr ) );
-    // Location location = Context.getLocationService().getLocation( location_id
-    // );
-    //
-    // DataValueSet dvs = service.evaluateReportDefinition(
-    // service.getReportDefinition( reportDefinition_id ), period, location );
-    //
-    // response.setContentType( "application/xml" );
-    // response.setCharacterEncoding( "UTF-8" );
-    // response.addHeader( "Content-Disposition",
-    // "attachment; filename=report.xml" );
-    //
-    // dvs.marshall( response.getOutputStream());
-    // }
-
-    @RequestMapping( value = "/module/dhisreport/syncReports", method = RequestMethod.GET )
-    public void syncReports( ModelMap model )
-    {
-        DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
-
-        model.addAttribute( "user", Context.getAuthenticatedUser() );
-        model.addAttribute( "reportDefinitions", service.getAllReportDefinitions() );
-    }
-
-    private String replacedateStrMonth( String dateStr )
-    {
-
-        String str = "";
-        // System.out.println( dateStr.substring( 5, 8 ) );
-
-        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Jan" ) )
-        {
-            //System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Jan", "01" );
-            // System.out.println( "converting date" + str );
-        }
-        else if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Feb" ) )
-        {
-            //  System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Feb", "02" );
-            //  System.out.println( "converting date" + str );
-        }
-        else if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Mar" ) )
-        {
-            // System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Mar", "03" );
-            // System.out.println( "converting date" + str );
-        }
-        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Apr" ) )
-        {
-            // System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Apr", "04" );
-            // System.out.println( "converting date" + str );
-        }
-        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "May" ) )
-        {
-            // System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "May", "05" );
-            // System.out.println( "converting date" + str );
-        }
-        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Jun" ) )
-        {
-            // System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Jun", "06" );
-            //  System.out.println( "converting date" + str );
-        }
-        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Jul" ) )
-        {
-            //  System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Jul", "07" );
-        }
-        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Aug" ) )
-        {
-            // System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Aug", "08" );
-            // System.out.println( "converting date" + str );
-        }
-        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Sep" ) )
-        {
-            //  System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Sep", "09" );
-            // System.out.println( "converting date" + str );
-        }
-        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Oct" ) )
-        {
-            // System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Oct", "10" );
-            // System.out.println( "converting date" + str );
-        }
-        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Nov" ) )
-        {
-            // System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Nov", "11" );
-            // System.out.println( "converting date" + str );
-        }
-        if ( dateStr.substring( 5, 8 ).equalsIgnoreCase( "Dec" ) )
-        {
-            // System.out.println( "converting date" );
-            str = dateStr.replaceFirst( "Dec", "12" );
-            //  System.out.println( "converting date" + str );
-        }
-
-        return str;
-    }
-
-    AdxType getAdxType( DataValueSet dvs, String timeperiod )
-    {
-        AdxType adxType = new AdxType();
-        adxType.setExported( dvs.getCompleteDate() );
-        GroupType gt = new GroupType();
-        List<DataValueType> dvTypeList = new ArrayList<DataValueType>();
-        for ( DataValue dv : dvs.getDataValues() )
-        {
-            DataValueType dvtype = new DataValueType();
-            dvtype.setDataElement( dv.getDataElement() );
-            dvtype.setValue( new BigDecimal( dv.getValue() ) );
-            dvTypeList.add( dvtype );
-        }
-        gt.getDataValue().addAll( dvTypeList );
-        gt.setOrgUnit( dvs.getOrgUnit() );
-        gt.setDataSet( dvs.getDataSet() );
-        gt.setPeriod( timeperiod + "/P1M" );
-        adxType.getGroup().add( gt );
-        return adxType;
+        return server;
     }
 
 }

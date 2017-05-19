@@ -73,7 +73,7 @@ public class Dhis2ServerController
         String dhisurl = Context.getAdministrationService().getGlobalProperty( "dhisreport.dhis2URL" );
         String dhisusername = Context.getAdministrationService().getGlobalProperty( "dhisreport.dhis2UserName" );
         String dhispassword = Context.getAdministrationService().getGlobalProperty( "dhisreport.dhis2Password" );
-
+        String dhisstandard = Context.getAdministrationService().getGlobalProperty( "dhisreport.dhis2Standard" );
         URL url = null;
         try
         {
@@ -92,6 +92,7 @@ public class Dhis2ServerController
         server.setUrl( url );
         server.setUsername( dhisusername );
         server.setPassword( dhispassword );
+        server.setStandard( dhisstandard );
 
         model.addAttribute( "user", Context.getAuthenticatedUser() );
         model.addAttribute( "dhis2Server", server );
@@ -119,7 +120,6 @@ public class Dhis2ServerController
         String dhisurl = Context.getAdministrationService().getGlobalProperty( "dhisreport.dhis2URL" );
         String dhisusername = Context.getAdministrationService().getGlobalProperty( "dhisreport.dhis2UserName" );
         String dhispassword = Context.getAdministrationService().getGlobalProperty( "dhisreport.dhis2Password" );
-
         URL url = null;
         try
         {
@@ -149,7 +149,8 @@ public class Dhis2ServerController
     public void saveConfig( ModelMap model, @RequestParam( value = "url", required = true )
     String urlString, @RequestParam( value = "username", required = true )
     String username, @RequestParam( value = "password", required = true )
-    String password, WebRequest webRequest )
+    String password, @RequestParam( value = "standard", required = false )
+    String standard, WebRequest webRequest )
         throws ParseException, MalformedURLException
     {
         DHIS2ReportingService service = Context.getService( DHIS2ReportingService.class );
@@ -166,7 +167,7 @@ public class Dhis2ServerController
         server.setUrl( url );
         server.setUsername( username );
         server.setPassword( password );
-
+        server.setStandard( standard );
         service.setDhis2Server( server );
 
         boolean val = testConnection( url, username, password, server, webRequest, model );
@@ -188,7 +189,9 @@ public class Dhis2ServerController
             globalProperty.setProperty( "dhisreport.dhis2Password" );
             globalProperty.setPropertyValue( password );
             Context.getAdministrationService().saveGlobalProperty( globalProperty );
-
+            globalProperty.setProperty( "dhisreport.dhis2Standard" );
+            globalProperty.setPropertyValue( standard );
+            Context.getAdministrationService().saveGlobalProperty( globalProperty );
         }
         else
         {

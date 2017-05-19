@@ -31,7 +31,7 @@ public class Dhis2Exception
 
     private HttpDhis2Server server;
 
-    Dhis2Exception( HttpDhis2Server server, String message, Throwable cause )
+    public Dhis2Exception( HttpDhis2Server server, String message, Throwable cause )
     {
         super( message, cause );
         this.server = server;

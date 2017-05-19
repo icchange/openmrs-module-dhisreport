@@ -3,8 +3,20 @@
 
 <%@ include file="template/localHeader.jsp"%>
 
+<script>
+function showhide(index){
+	if(document.getElementById('list'+index).style.display == 'none'){
+    	document.getElementById('list'+index).style.display = 'block';
+    }else{
+    	document.getElementById('list'+index).style.display = 'none';
+    }
+}
+</script>
+
 <h3><spring:message code="dhisreport.reportResult" /></h3>
+<c:set var="count" value="0"/>
 <c:forEach var="aggregatedValues" items="${aggregatedList}">
+
 <c:if test="${not empty aggregatedValues.dataValueSet}">
 <h3>------------------------------------------------------------------------</h3>
     <div>
@@ -25,23 +37,30 @@
      -->
      <br>
 <div>
+	<button onclick="showhide(${count})">show details</button>
+	<div id="list${count}" style="display: none;">
 	<table style="width:600px">
 	<tr>
 	<th>DataElement Name</th>
-	<th>DataElement Code</th>		
+	<th>DataElement Code</th>
+	<th>Disaggregate</th>
 	<th>Value</th>
 	</tr>
 	<tr>
-    <c:forEach var="dvm" items="${aggregatedValues.dataElementMap}">
-    <tr>
-  		<td>${dvm.key.name}</td>
-  		<td>${dvm.key.code}</td>		
-  		<td>${dvm.value}</td>
-  	</tr>
-	<tr>
-  	</c:forEach>
+	<c:if test="${fn:length(aggregatedValues.dataValueSet.dataValues) gt 0}">
+    	<c:forEach var="dv" items="${aggregatedValues.dataValueSet.dataValues}">
+    		<tr>
+  				<td>${dv.dataElementName}</td>
+  				<td>${dv.dataElementCode}</td>
+  				<td>${dv.categoryOptionComboName}</td>
+  				<td>${dv.value}</td>
+  			</tr>
+			<tr>
+  		</c:forEach>
+  	</c:if>
 	</table>
 	</div>
+</div>
 </c:if>
 <c:if test="${not empty aggregatedValues.importSummary}">
     
@@ -69,6 +88,8 @@
             </table>
         </div>
     </c:if>
+    <c:set var="count" value="${count+1}"/>
 </c:forEach>
-
+<a href="http://dev.kmri.co.ke:60055/dhis-web-dashboard-integration/index.action" target="_blank">go to DHIS2</a>
+<br/>
 <%@ include file="/WEB-INF/template/footer.jsp"%>

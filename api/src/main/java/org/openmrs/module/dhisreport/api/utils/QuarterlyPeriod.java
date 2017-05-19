@@ -19,6 +19,7 @@
  **/
 package org.openmrs.module.dhisreport.api.utils;
 
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeConstants;
@@ -101,6 +102,15 @@ public class QuarterlyPeriod
     {
         DateTime dt = new DateTime( getStartDate() );
         return dt.getYear() + "Q" + ((dt.getMonthOfYear() / 3) + 1);
+    }
+
+    @Override
+    public Period getAsIsoStringNextValue( Integer nextValue )
+    {
+        Date date = getStartDate();
+        DateTime dt = new DateTime( date );
+        dt = dt.plusMonths( nextValue * 4 );
+        return new QuarterlyPeriod( dt.toDate() );
     }
 
 }

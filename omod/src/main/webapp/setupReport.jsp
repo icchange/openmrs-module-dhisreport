@@ -183,13 +183,17 @@ function applyWeeklyHighlight() {
             <td><spring:message code="dhisreport.Date" /></td>
             <td><input type="text" name="date" id="monthpicker"/></td>
         </tr>
-           <tr>
-               <td><spring:message code="dhisreport.selectMapping" /></td>
-               <td>
+        <tr>
+           	<td>Number of consecutive dates</td>
+           	<td><input type="number" name="consecutive" min="1" value="1" /> </td>
+        </tr>
+        <tr>
+            <td><spring:message code="dhisreport.selectMapping" /></td>
+            <td>
                    <input type="radio" name="mappingType" value="Reporting">Reporting
                    <input type="radio" name="mappingType" value="SQL">SQL
-               </td>
-           </tr>
+            </td>
+        </tr>
         <tr>                   
             <td /><td><select name="resultDestination">
                     <option value="preview"><spring:message code="dhisreport.Preview" /></option>

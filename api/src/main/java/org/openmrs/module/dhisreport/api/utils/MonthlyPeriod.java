@@ -74,4 +74,13 @@ public class MonthlyPeriod
         return new SimpleDateFormat( ISO_FORMAT ).format( getStartDate() );
     }
 
+    @Override
+    public Period getAsIsoStringNextValue( Integer nextValue )
+    {
+        Date date = getStartDate();
+        DateTime dt = new DateTime( date );
+        dt = dt.plusMonths( nextValue.intValue() );
+        return new MonthlyPeriod( dt.toDate() );
+    }
+
 }

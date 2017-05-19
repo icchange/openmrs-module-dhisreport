@@ -19,11 +19,7 @@
  **/
 package org.openmrs.module.dhisreport.api.db.hibernate;
 
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -32,6 +28,7 @@ import org.hibernate.Query;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.Restrictions;
+import org.hibernate.transform.AliasToEntityMapResultTransformer;
 import org.openmrs.Location;
 import org.openmrs.module.dhisreport.api.DHIS2ReportingException;
 import org.openmrs.module.dhisreport.api.db.DHIS2ReportingDAO;
@@ -76,9 +73,27 @@ public class HibernateDHIS2ReportingDAO
     }
 
     @Override
+    public DataElementQuery getDataElementQuery( Integer id )
+    {
+        return (DataElementQuery) sessionFactory.getCurrentSession().get( DataElementQuery.class, id );
+    }
+
+    @Override
+    public DataElementQuery saveDataElementQuery( DataElementQuery de )
+    {
+        return (DataElementQuery) saveObject( de );
+    }
+
+    @Override
+    public void deleteDataElementQuery( DataElementQuery de )
+    {
+        sessionFactory.getCurrentSession().delete( de );
+    }
+
+    @Override
     public DataElement getDataElement( Integer id )
     {
-        return (DataElement) getCurrentSession().get( DataElement.class, id );
+        return (DataElement) sessionFactory.getCurrentSession().get( DataElement.class, id );
     }
 
     @Override
@@ -90,13 +105,13 @@ public class HibernateDHIS2ReportingDAO
     @Override
     public void deleteDataElement( DataElement de )
     {
-        getCurrentSession().delete( de );
+        sessionFactory.getCurrentSession().delete( de );
     }
 
     @Override
     public Disaggregation getDisaggregation( Integer id )
     {
-        return (Disaggregation) getCurrentSession().get( Disaggregation.class, id );
+        return (Disaggregation) sessionFactory.getCurrentSession().get( Disaggregation.class, id );
     }
 
     @Override
@@ -108,7 +123,7 @@ public class HibernateDHIS2ReportingDAO
     @Override
     public ReportDefinition getReportDefinition( Integer id )
     {
-        return (ReportDefinition) getCurrentSession().get( ReportDefinition.class, id );
+        return (ReportDefinition) sessionFactory.getCurrentSession().get( ReportDefinition.class, id );
     }
 
     @Override
@@ -122,34 +137,34 @@ public class HibernateDHIS2ReportingDAO
     @Override
     public Collection<DataElement> getAllDataElements()
     {
-        Query query = getCurrentSession().createQuery( "from DataElement order by name asc" );
+        Query query = sessionFactory.getCurrentSession().createQuery( "from DataElement order by name asc" );
         return (List<DataElement>) query.list();
     }
 
     @Override
     public Collection<Disaggregation> getAllDisaggregations()
     {
-        Query query = getCurrentSession().createQuery( "from Disaggregation" );
+        Query query = sessionFactory.getCurrentSession().createQuery( "from Disaggregation" );
         return (List<Disaggregation>) query.list();
     }
 
     @Override
     public void deleteDisaggregation( Disaggregation disagg )
     {
-        getCurrentSession().delete( disagg );
+        sessionFactory.getCurrentSession().delete( disagg );
     }
 
     @Override
     public Collection<ReportDefinition> getAllReportDefinitions()
     {
-        Query query = getCurrentSession().createQuery( "from ReportDefinition order by name asc" );
+        Query query = sessionFactory.getCurrentSession().createQuery( "from ReportDefinition order by name asc" );
         return (List<ReportDefinition>) query.list();
     }
 
     @Override
     public void deleteReportDefinition( ReportDefinition rd )
     {
-        getCurrentSession().delete( rd );
+        sessionFactory.getCurrentSession().delete( rd );
     }
 
     /*
@@ -176,7 +191,7 @@ public class HibernateDHIS2ReportingDAO
                 + dvt.getDataelement().getName() + " : " + dvt.getDisaggregation().getName() );
         }
 
-        Query query = getCurrentSession().createSQLQuery( queryString );
+        Query query = sessionFactory.getCurrentSession().createSQLQuery( queryString );
 
         List<String> parameters = new ArrayList<String>( Arrays.asList( query.getNamedParameters() ) );
         // loactionId is optional
@@ -186,7 +201,48 @@ public class HibernateDHIS2ReportingDAO
         }
         query.setParameter( "startOfPeriod", period.getStartDate() );
         query.setParameter( "endOfPeriod", period.getEndDate() );
-        return query.uniqueResult().toString();
+
+        Object result = query.uniqueResult();
+        if ( result != null )
+        {
+            return result.toString();
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    @Override
+    public List<Object[]> evaluateDataElementQuery( DataElementQuery dq, Location location )
+        throws DHIS2ReportingException
+    {
+        String queryString = dq.getQuery();
+        queryString = queryString.replaceAll( "\t", " " );
+        queryString = queryString.replaceAll( "\n", " " );
+        queryString = queryString.trim();
+
+        if ( queryString == null || queryString.isEmpty() )
+        {
+            log.debug( "Empty query for Data Element Query" );
+            return null;
+        }
+
+        if ( dq.potentialUpdateDelete() )
+        {
+            throw new DHIS2ReportingException(
+                "Attempt to execute potential update/delete query for Data Element Query" );
+        }
+
+        Query query = sessionFactory.getCurrentSession().createSQLQuery( queryString );
+
+        List<String> parameters = new ArrayList<String>( Arrays.asList( query.getNamedParameters() ) );
+        // loactionId is optional
+        if ( parameters.contains( "locationId" ) )
+        {
+            query.setParameter( "locationId", location.getId().toString() );
+        }
+        return query.list();
     }
 
     // --------------------------------------------------------------------------------------------------------------
@@ -194,7 +250,7 @@ public class HibernateDHIS2ReportingDAO
     // --------------------------------------------------------------------------------------------------------------
     public Identifiable getObjectByUid( String uid, Class<?> clazz )
     {
-        Criteria criteria = getCurrentSession().createCriteria( clazz );
+        Criteria criteria = sessionFactory.getCurrentSession().createCriteria( clazz );
         criteria.add( Restrictions.eq( "uid", uid ) );
         return (Identifiable) criteria.uniqueResult();
     }
@@ -202,7 +258,7 @@ public class HibernateDHIS2ReportingDAO
     @Transactional
     public Identifiable saveReportDefinitionObject( ReportDefinition object )
     {
-        Session session = getCurrentSession();
+        Session session = sessionFactory.getCurrentSession();
 
         // force merge if uid already exists
         Criteria criteria = session.createCriteria( object.getClass() );
@@ -228,7 +284,7 @@ public class HibernateDHIS2ReportingDAO
     @Transactional
     public Identifiable saveDataElementObject( DataElement object )
     {
-        Session session = getCurrentSession();
+        Session session = sessionFactory.getCurrentSession();
         // force merge if uid already exists
 
         DataElement existingObject = (DataElement) getObjectByUid( object.getUid(), object.getClass() );
@@ -242,7 +298,7 @@ public class HibernateDHIS2ReportingDAO
             return existingObject;
 
         }
-        // getCurrentSession().saveOrUpdate( object );
+        // sessionFactory.getCurrentSession().saveOrUpdate( object );
         session.save( object );
         return object;
     }
@@ -250,7 +306,7 @@ public class HibernateDHIS2ReportingDAO
     @Transactional
     public Identifiable saveObject( Identifiable object )
     {
-        Session session = getCurrentSession();
+        Session session = sessionFactory.getCurrentSession();
         // force merge if uid already exists
         Identifiable existingObject = getObjectByUid( object.getUid(), object.getClass() );
         if ( existingObject != null )
@@ -259,8 +315,14 @@ public class HibernateDHIS2ReportingDAO
             object.setId( existingObject.getId() );
             session.load( object, object.getId() );
         }
-        getCurrentSession().saveOrUpdate( object );
+        sessionFactory.getCurrentSession().saveOrUpdate( object );
         return object;
+    }
+
+    @Override
+    public DataElementQuery getDataElementQueryByUid( String uid )
+    {
+        return (DataElementQuery) getObjectByUid( uid, DataElementQuery.class );
     }
 
     @Override
@@ -284,21 +346,28 @@ public class HibernateDHIS2ReportingDAO
     @Override
     public ReportDefinition getReportDefinitionByCode( String code )
     {
-        Criteria criteria = getCurrentSession().createCriteria( ReportDefinition.class );
+        Criteria criteria = sessionFactory.getCurrentSession().createCriteria( ReportDefinition.class );
         criteria.add( Restrictions.eq( "code", code ) );
         return (ReportDefinition) criteria.uniqueResult();
+    }
+
+    public List<ReportDefinition> getReportDefinitionByPeriodType( String periodType )
+    {
+        Criteria criteria = sessionFactory.getCurrentSession().createCriteria( ReportDefinition.class );
+        criteria.add( Restrictions.eq( "periodType", periodType ) );
+        return (List<ReportDefinition>) criteria.list();
     }
 
     @Override
     public DataValueTemplate getDataValueTemplate( Integer id )
     {
-        return (DataValueTemplate) getCurrentSession().get( DataValueTemplate.class, id );
+        return (DataValueTemplate) sessionFactory.getCurrentSession().get( DataValueTemplate.class, id );
     }
 
     @Override
     public DataValueTemplate saveDataValueTemplate( DataValueTemplate dvt )
     {
-        getCurrentSession().saveOrUpdate( dvt );
+        sessionFactory.getCurrentSession().saveOrUpdate( dvt );
         return dvt;
     }
 
@@ -313,7 +382,7 @@ public class HibernateDHIS2ReportingDAO
         dvt.setDisaggregation( dis );
         dvt.setReportDefinition( rd );
 
-        Criteria criteria = getCurrentSession().createCriteria( DataValueTemplate.class );
+        Criteria criteria = sessionFactory.getCurrentSession().createCriteria( DataValueTemplate.class );
         criteria.add( Restrictions.eq( "reportDefinition", rd ) ).add( Restrictions.eq( "dataelement", de ) ).add(
             Restrictions.eq( "disaggregation", dis ) );
 
@@ -321,12 +390,12 @@ public class HibernateDHIS2ReportingDAO
 
         if ( dvt_db == null )
         {
-            getCurrentSession().save( dvt );
+            sessionFactory.getCurrentSession().save( dvt );
             return dvt;
         }
         else
         {
-            getCurrentSession().saveOrUpdate( dvt );
+            sessionFactory.getCurrentSession().saveOrUpdate( dvt );
             return dvt_db;
         }
 
@@ -335,7 +404,7 @@ public class HibernateDHIS2ReportingDAO
     @Override
     public Location getLocationByOU_Code( String OU_Code )
     {
-        Criteria criteria = getCurrentSession().createCriteria( Location.class );
+        Criteria criteria = sessionFactory.getCurrentSession().createCriteria( Location.class );
         criteria.add( Restrictions.like( "name", OU_Code ) );
         return (Location) criteria.uniqueResult();
     }
@@ -344,34 +413,9 @@ public class HibernateDHIS2ReportingDAO
     public DataElement getDataElementByCode( String code )
     {
 
-        Criteria criteria = getCurrentSession().createCriteria( DataElement.class );
+        Criteria criteria = sessionFactory.getCurrentSession().createCriteria( DataElement.class );
         criteria.add( Restrictions.eq( "code", code ) );
         return (DataElement) criteria.uniqueResult();
 
-    }
-
-    /**
-     * Gets the current hibernate session while taking care of the hibernate 3 and 4 differences.
-     * 
-     * @return the current hibernate session.
-     */
-    private org.hibernate.Session getCurrentSession()
-    {
-        try
-        {
-            return sessionFactory.getCurrentSession();
-        }
-        catch ( NoSuchMethodError ex )
-        {
-            try
-            {
-                Method method = sessionFactory.getClass().getMethod( "getCurrentSession", null );
-                return (org.hibernate.Session) method.invoke( sessionFactory, null );
-            }
-            catch ( Exception e )
-            {
-                throw new RuntimeException( "Failed to get the current hibernate session", e );
-            }
-        }
     }
 }
