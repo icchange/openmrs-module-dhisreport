@@ -809,7 +809,7 @@ public class DHIS2ReportingServiceImpl
             {
                 importSummaries = postMetaData( metadataelements, eq );
                 //need to get the uids from dhis2 for each element generated
-                List<String[]> uids = getDhis2Metadata( metadataelements, eq.getPrefix() );
+                List<String[]> uids = getDhis2Metadata( metadataelements, eq.getCodeprefix() );
 
                 for ( int i = 0; i < uids.size(); i++ )
                 {

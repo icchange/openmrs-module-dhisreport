@@ -798,7 +798,9 @@ public class HttpDhis2Server
             {
                 Element dataElement = (Element) dataElementList.item( i );
                 String elementName = dataElement.getAttribute( "name" );
-                Object elementDatabaseId = listcontains( elements, elementName, prefix );
+                String elementCode = dataElement.getAttribute( "code" );
+
+                Object elementDatabaseId = listcontains( elements, elementCode, prefix );
                 String elementId;
                 if ( !elementDatabaseId.equals( "" ) )
                 {
@@ -991,7 +993,7 @@ public class HttpDhis2Server
     {
         for ( int i = 0; i < list.size(); i++ )
         {
-            if ( ((prefix + ": " + list.get( i )[1])).equals( item ) )
+            if ( ((prefix + list.get( i )[0])).equals( item ) )
             {
                 return (list.get( i )[0]);
             }

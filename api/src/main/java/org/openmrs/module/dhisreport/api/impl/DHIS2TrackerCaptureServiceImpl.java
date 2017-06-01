@@ -457,12 +457,14 @@ public class DHIS2TrackerCaptureServiceImpl
                 for ( TrackerCaptureEnrollment enrollment : report.getTrackerCaptureEnrollmentList() )
                 {
 
+                    /*
                     System.out.println( entity.getAttributes().get( report.getKeyAttribute().getName() )
                         + " "
                         + enrollment.checkQueryList( entity.getAttributes().get( report.getKeyAttribute().getName() ) )
                         + " "
                         + enrollment
                             .getQueryListDate( entity.getAttributes().get( report.getKeyAttribute().getName() ) ) );
+                     */
 
                     if ( enrollment.checkQueryList( entity.getAttributes().get( report.getKeyAttribute().getName() ) ) )
                     {
